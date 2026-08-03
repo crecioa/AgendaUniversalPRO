@@ -1,0 +1,58 @@
+# ==========================================================
+# Agenda Universal PRO
+# .gitignore
+# ==========================================================
+
+# Ambiente virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+
+# Backup
+backup/
+
+# Arquivos temporários
+*.tmp
+*.temp
+~$*.doc
+~$*.docx
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Saída do programa
+output/
+
+# Cache
+.cache/
+
+# Arquivos compilados
+*.pyd
+*.pyo
