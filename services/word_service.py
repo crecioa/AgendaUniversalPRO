@@ -10,59 +10,50 @@ from __future__ import annotations
 from pathlib import Path
 
 from docx import Document
+from docx.document import Document as DocxDocument
 
 from services.logger_service import LoggerService
 
 
 class WordService:
-    """Serviço para abrir e salvar documentos do Word."""
+    """Serviço para abrir e salvar documentos Word."""
 
     def __init__(self) -> None:
         self.logger = LoggerService.get_logger()
 
-    def abrir_documento(self, arquivo: str | Path) -> Document:
-        """
-        Abre um documento do Word.
+    def abrir_documento(self, arquivo: str | Path) -> DocxDocument:
+        """Abre um documento Word."""
 
-        Args:
-            arquivo: Caminho do arquivo .docx.
+        caminho = Path(arquivo)
 
-        Returns:
-            Objeto Document.
-        """
+        if not caminho.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: {caminho}")
 
-        arquivo = Path(arquivo)
+        self.logger.info("Abrindo documento: %s", caminho.name)
 
-        if not arquivo.exists():
-            raise FileNotFoundError(f"Arquivo não encontrado: {arquivo}")
+        return Document(str(caminho))
 
-        self.logger.info(f"Abrindo documento: {arquivo.name}")
+    def salvar_documento(
+        self,
+        documento: DocxDocument,
+        destino: str | Path,
+    ) -> None:
+        """Salva o documento."""
 
-        return Document(arquivo)
+        caminho = Path(destino)
 
-    def salvar_documento(self, documento: Document, destino: str | Path) -> None:
-        """
-        Salva o documento.
+        documento.save(str(caminho))
 
-        Args:
-            documento: Documento aberto.
-            destino: Caminho onde será salvo.
-        """
-
-        destino = Path(destino)
-
-        documento.save(destino)
-
-        self.logger.info(f"Documento salvo: {destino.name}")
+        self.logger.info("Documento salvo: %s", caminho.name)
 
     @staticmethod
-    def contar_paragrafos(documento: Document) -> int:
-        """Retorna a quantidade de parágrafos do documento."""
+    def contar_paragrafos(documento: DocxDocument) -> int:
+        """Retorna a quantidade de parágrafos."""
 
         return len(documento.paragraphs)
 
     @staticmethod
-    def contar_tabelas(documento: Document) -> int:
-        """Retorna a quantidade de tabelas do documento."""
+    def contar_tabelas(documento: DocxDocument) -> int:
+        """Retorna a quantidade de tabelas."""
 
         return len(documento.tables)
