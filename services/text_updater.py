@@ -22,7 +22,9 @@ class TextUpdater:
     def __init__(self) -> None:
         self.logger: Logger = LoggerService.get_logger()
 
-    def localizar_datas(self, documento: DocxDocument) -> list[tuple[int, str, list[str]]]:
+    def localizar_datas(
+        self, documento: DocxDocument
+    ) -> list[tuple[int, str, list[str]]]:
         """
         Percorre todos os parágrafos procurando datas.
 
