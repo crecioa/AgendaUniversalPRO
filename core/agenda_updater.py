@@ -12,6 +12,7 @@ from pathlib import Path
 from services.backup_service import BackupService
 from services.logger_service import LoggerService
 from services.word_service import WordService
+from services.text_updater import TextUpdater
 
 
 class AgendaUpdater:
@@ -21,6 +22,7 @@ class AgendaUpdater:
         self.logger = LoggerService.get_logger()
         self.word_service = WordService()
         self.backup_service = BackupService()
+        self.text_updater = TextUpdater()
 
     def abrir_agenda(self, arquivo: str | Path):
         """
