@@ -11,8 +11,8 @@ from pathlib import Path
 
 from services.backup_service import BackupService
 from services.logger_service import LoggerService
-from services.word_service import WordService
 from services.text_updater import TextUpdater
+from services.word_service import WordService
 
 
 class AgendaUpdater:
@@ -26,7 +26,7 @@ class AgendaUpdater:
 
     def abrir_agenda(self, arquivo: str | Path):
         """
-        Cria um backup e abre um documento Word.
+        Cria um backup, abre o documento Word e localiza as datas.
 
         Args:
             arquivo: Caminho do documento.
@@ -44,5 +44,12 @@ class AgendaUpdater:
         documento = self.word_service.abrir_documento(caminho)
 
         self.logger.info("Documento carregado com sucesso.")
+
+        ocorrencias = self.text_updater.localizar_datas(documento)
+
+        self.logger.info(
+            "Processamento concluído. %d parágrafo(s) com datas.",
+            len(ocorrencias),
+        )
 
         return documento
