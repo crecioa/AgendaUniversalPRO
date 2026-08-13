@@ -2,8 +2,8 @@
 Agenda Universal PRO
 Arquivo: services/text_updater.py
 
-Serviço responsável por localizar datas nos parágrafos
-de um documento Word.
+Serviço responsável por localizar e atualizar datas
+nos parágrafos de um documento Word.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from services.logger_service import LoggerService
 
 
 class TextUpdater:
-    """Localiza datas existentes nos parágrafos do documento."""
+    """Localiza e atualiza datas existentes nos parágrafos do documento."""
 
     def __init__(self) -> None:
         self.logger: Logger = LoggerService.get_logger()
@@ -41,7 +41,6 @@ class TextUpdater:
         self.logger.info("Iniciando leitura dos parágrafos.")
 
         for indice, paragrafo in enumerate(documento.paragraphs):
-
             texto = paragrafo.text.strip()
 
             if not texto:
@@ -65,3 +64,52 @@ class TextUpdater:
         )
 
         return ocorrencias
+
+    def atualizar_datas(
+        self,
+        documento: DocxDocument,
+        substituicoes: dict[str, str],
+    ) -> int:
+        """
+        Substitui datas nos parágrafos do documento.
+
+        Args:
+            documento: Documento Word aberto.
+            substituicoes: Dicionário no formato:
+                {"data_antiga": "data_nova"}
+
+        Returns:
+            Quantidade de substituições realizadas.
+        """
+
+        quantidade = 0
+
+        self.logger.info("Iniciando atualização das datas.")
+
+        for paragrafo in documento.paragraphs:
+            texto_original = paragrafo.text
+
+            if not texto_original.strip():
+                continue
+
+            texto_atualizado = texto_original
+
+            for data_antiga, data_nova in substituicoes.items():
+                ocorrencias = texto_atualizado.count(data_antiga)
+
+                if ocorrencias:
+                    texto_atualizado = texto_atualizado.replace(
+                        data_antiga,
+                        data_nova,
+                    )
+                    quantidade += ocorrencias
+
+            if texto_atualizado != texto_original:
+                paragrafo.text = texto_atualizado
+
+        self.logger.info(
+            "Atualização concluída. %d substituição(ões) realizada(s).",
+            quantidade,
+        )
+
+        return quantidade
