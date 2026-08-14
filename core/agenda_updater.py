@@ -53,3 +53,50 @@ class AgendaUpdater:
         )
 
         return documento
+
+    def atualizar_agenda(
+        self,
+        arquivo: str | Path,
+        substituicoes: dict[str, str],
+        destino: str | Path,
+    ) -> int:
+        """
+        Atualiza as datas de uma agenda e salva o resultado.
+
+        Args:
+            arquivo: Documento Word original.
+            substituicoes: Dicionário com as datas a substituir.
+            destino: Caminho onde o documento atualizado será salvo.
+
+        Returns:
+            Quantidade de substituições realizadas.
+        """
+
+        caminho = Path(arquivo)
+        caminho_destino = Path(destino)
+
+        self.logger.info(
+            "Iniciando atualização da agenda: %s",
+            caminho.name,
+        )
+
+        self.backup_service.criar_backup(caminho)
+
+        documento = self.word_service.abrir_documento(caminho)
+
+        quantidade = self.text_updater.atualizar_datas(
+            documento,
+            substituicoes,
+        )
+
+        self.word_service.salvar_documento(
+            documento,
+            caminho_destino,
+        )
+
+        self.logger.info(
+            "Agenda atualizada com sucesso. %d substituição(ões).",
+            quantidade,
+        )
+
+        return quantidade
