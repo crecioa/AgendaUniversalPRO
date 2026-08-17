@@ -113,3 +113,80 @@ class TextUpdater:
         )
 
         return quantidade
+
+    def atualizar_ano(
+        self,
+        documento: DocxDocument,
+        ano_origem: int,
+        ano_destino: int,
+    ) -> int:
+        """
+        Atualiza automaticamente o ano das datas existentes
+        nos parágrafos do documento.
+
+        Args:
+            documento: Documento Word aberto.
+            ano_origem: Ano das datas que serão atualizadas.
+            ano_destino: Novo ano das datas.
+
+        Returns:
+            Quantidade de datas atualizadas.
+        """
+
+        quantidade = 0
+
+        self.logger.info(
+            "Iniciando atualização automática de %d para %d.",
+            ano_origem,
+            ano_destino,
+        )
+
+        for paragrafo in documento.paragraphs:
+            texto_original = paragrafo.text
+
+            if not texto_original.strip():
+                continue
+
+            datas = DateParser.encontrar_datas(texto_original)
+
+            if not datas:
+                continue
+
+            texto_atualizado = texto_original
+
+            for data in datas:
+                data_convertida = DateParser.converter_data(data)
+
+                if data_convertida is None:
+                    continue
+
+                if data_convertida.year != ano_origem:
+                    continue
+
+                nova_data = DateParser.atualizar_ano(
+                    data,
+                    ano_destino,
+                )
+
+                if nova_data is None:
+                    continue
+
+                ocorrencias = texto_atualizado.count(data)
+
+                if ocorrencias:
+                    texto_atualizado = texto_atualizado.replace(
+                        data,
+                        nova_data,
+                    )
+                    quantidade += ocorrencias
+
+            if texto_atualizado != texto_original:
+                paragrafo.text = texto_atualizado
+
+        self.logger.info(
+            "Atualização automática concluída. "
+            "%d substituição(ões) realizada(s).",
+            quantidade,
+        )
+
+        return quantidade

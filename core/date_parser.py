@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Optional
 
 
 class DateParser:
@@ -46,7 +45,7 @@ class DateParser:
             return False
 
     @staticmethod
-    def converter_data(data: str) -> Optional[datetime]:
+    def converter_data(data: str) -> datetime | None:
         """
         Converte uma string em datetime.
         """
@@ -55,3 +54,28 @@ class DateParser:
             return datetime.strptime(data, "%d/%m/%Y")
         except ValueError:
             return None
+
+    @staticmethod
+    def atualizar_ano(data: str, novo_ano: int) -> str | None:
+        """
+        Atualiza o ano de uma data.
+
+        Args:
+            data: Data no formato dd/mm/aaaa.
+            novo_ano: Ano que deverá substituir o ano atual.
+
+        Returns:
+            Data com o novo ano ou None se a nova data for inválida.
+        """
+
+        data_convertida = DateParser.converter_data(data)
+
+        if data_convertida is None:
+            return None
+
+        try:
+            nova_data = data_convertida.replace(year=novo_ano)
+        except ValueError:
+            return None
+
+        return nova_data.strftime("%d/%m/%Y")
