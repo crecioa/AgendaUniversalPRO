@@ -100,3 +100,57 @@ class AgendaUpdater:
         )
 
         return quantidade
+
+    def atualizar_ano(
+        self,
+        arquivo: str | Path,
+        ano_origem: int,
+        ano_destino: int,
+        destino: str | Path,
+    ) -> int:
+        """
+        Atualiza automaticamente o ano das datas de uma agenda
+        e salva o resultado.
+
+        Args:
+            arquivo: Documento Word original.
+            ano_origem: Ano das datas que serão atualizadas.
+            ano_destino: Novo ano das datas.
+            destino: Caminho onde o documento atualizado será salvo.
+
+        Returns:
+            Quantidade de datas atualizadas.
+        """
+
+        caminho = Path(arquivo)
+        caminho_destino = Path(destino)
+
+        self.logger.info(
+            "Iniciando atualização automática da agenda: %s",
+            caminho.name,
+        )
+
+        self.backup_service.criar_backup(caminho)
+
+        documento = self.word_service.abrir_documento(caminho)
+
+        quantidade = self.text_updater.atualizar_ano(
+            documento,
+            ano_origem,
+            ano_destino,
+        )
+
+        self.word_service.salvar_documento(
+            documento,
+            caminho_destino,
+        )
+
+        self.logger.info(
+            "Agenda atualizada de %d para %d. "
+            "%d substituição(ões) realizada(s).",
+            ano_origem,
+            ano_destino,
+            quantidade,
+        )
+
+        return quantidade
