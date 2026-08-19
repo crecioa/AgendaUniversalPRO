@@ -70,10 +70,19 @@ class AgendaUpdater:
 
         Returns:
             Quantidade de substituições realizadas.
+
+        Raises:
+            FileNotFoundError:
+                Se o arquivo original não existir.
+            ValueError:
+                Se o destino for igual ao arquivo original.
         """
 
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
+
+        self._validar_arquivo_origem(caminho)
+        self._validar_destino(caminho, caminho_destino)
 
         self.logger.info(
             "Iniciando atualização da agenda: %s",
@@ -120,10 +129,21 @@ class AgendaUpdater:
 
         Returns:
             Quantidade de datas atualizadas.
+
+        Raises:
+            FileNotFoundError:
+                Se o arquivo original não existir.
+            ValueError:
+                Se os anos forem inválidos ou iguais, ou se o
+                destino for igual ao arquivo original.
         """
 
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
+
+        self._validar_arquivo_origem(caminho)
+        self._validar_anos(ano_origem, ano_destino)
+        self._validar_destino(caminho, caminho_destino)
 
         self.logger.info(
             "Iniciando atualização automática da agenda: %s",
@@ -154,3 +174,63 @@ class AgendaUpdater:
         )
 
         return quantidade
+
+    @staticmethod
+    def _validar_arquivo_origem(caminho: Path) -> None:
+        """Valida a existência do documento original."""
+
+        if not caminho.exists():
+            raise FileNotFoundError(
+                f"Arquivo de origem não encontrado: {caminho}"
+            )
+
+        if not caminho.is_file():
+            raise ValueError(
+                f"O caminho de origem não é um arquivo: {caminho}"
+            )
+
+        if caminho.suffix.lower() != ".docx":
+            raise ValueError(
+                "O arquivo de origem deve possuir extensão .docx."
+            )
+
+    @staticmethod
+    def _validar_destino(
+        origem: Path,
+        destino: Path,
+    ) -> None:
+        """Impede que o arquivo original seja sobrescrito."""
+
+        if origem.resolve() == destino.resolve():
+            raise ValueError(
+                "O arquivo de destino não pode ser igual ao arquivo original."
+            )
+
+        if destino.suffix.lower() != ".docx":
+            raise ValueError(
+                "O arquivo de destino deve possuir extensão .docx."
+            )
+
+    @staticmethod
+    def _validar_anos(
+        ano_origem: int,
+        ano_destino: int,
+    ) -> None:
+        """Valida os anos utilizados na atualização."""
+
+        if not isinstance(ano_origem, int):
+            raise ValueError("O ano de origem deve ser um número inteiro.")
+
+        if not isinstance(ano_destino, int):
+            raise ValueError("O ano de destino deve ser um número inteiro.")
+
+        if ano_origem < 1 or ano_origem > 9999:
+            raise ValueError("O ano de origem deve estar entre 1 e 9999.")
+
+        if ano_destino < 1 or ano_destino > 9999:
+            raise ValueError("O ano de destino deve estar entre 1 e 9999.")
+
+        if ano_origem == ano_destino:
+            raise ValueError(
+                "O ano de origem e o ano de destino não podem ser iguais."
+            )
