@@ -3,7 +3,7 @@ Agenda Universal PRO
 Arquivo: services/text_updater.py
 
 Serviço responsável por localizar e atualizar datas
-nos parágrafos de um documento Word.
+nos parágrafos e tabelas de um documento Word.
 """
 
 from __future__ import annotations
@@ -11,22 +11,24 @@ from __future__ import annotations
 from logging import Logger
 
 from docx.document import Document as DocxDocument
+from docx.table import _Cell
 
 from core.date_parser import DateParser
 from services.logger_service import LoggerService
 
 
 class TextUpdater:
-    """Localiza e atualiza datas existentes nos parágrafos do documento."""
+    """Localiza e atualiza datas em documentos Word."""
 
     def __init__(self) -> None:
         self.logger: Logger = LoggerService.get_logger()
 
     def localizar_datas(
-        self, documento: DocxDocument
+        self,
+        documento: DocxDocument,
     ) -> list[tuple[int, str, list[str]]]:
         """
-        Percorre todos os parágrafos procurando datas.
+        Percorre os parágrafos procurando datas.
 
         Args:
             documento: Documento Word aberto.
@@ -38,9 +40,13 @@ class TextUpdater:
 
         ocorrencias: list[tuple[int, str, list[str]]] = []
 
-        self.logger.info("Iniciando leitura dos parágrafos.")
+        self.logger.info(
+            "Iniciando leitura dos parágrafos."
+        )
 
-        for indice, paragrafo in enumerate(documento.paragraphs):
+        for indice, paragrafo in enumerate(
+            documento.paragraphs
+        ):
             texto = paragrafo.text.strip()
 
             if not texto:
@@ -49,7 +55,9 @@ class TextUpdater:
             datas = DateParser.encontrar_datas(texto)
 
             if datas:
-                ocorrencias.append((indice, texto, datas))
+                ocorrencias.append(
+                    (indice, texto, datas)
+                )
 
                 self.logger.info(
                     "Parágrafo %s: %d data(s) encontrada(s): %s",
@@ -65,13 +73,87 @@ class TextUpdater:
 
         return ocorrencias
 
+    @staticmethod
+    def _substituir_texto(
+        texto: str,
+        substituicoes: dict[str, str],
+    ) -> tuple[str, int]:
+        """
+        Substitui datas em um texto.
+
+        Returns:
+            Tupla contendo:
+                (texto atualizado, quantidade de substituições)
+        """
+
+        texto_atualizado = texto
+        quantidade = 0
+
+        for data_antiga, data_nova in substituicoes.items():
+            ocorrencias = texto_atualizado.count(
+                data_antiga
+            )
+
+            if ocorrencias:
+                texto_atualizado = texto_atualizado.replace(
+                    data_antiga,
+                    data_nova,
+                )
+
+                quantidade += ocorrencias
+
+        return texto_atualizado, quantidade
+
+    def _atualizar_paragrafo(
+        self,
+        paragrafo,
+        substituicoes: dict[str, str],
+    ) -> int:
+        """Atualiza as substituições de um parágrafo."""
+
+        texto_original = paragrafo.text
+
+        if not texto_original.strip():
+            return 0
+
+        texto_atualizado, quantidade = (
+            self._substituir_texto(
+                texto_original,
+                substituicoes,
+            )
+        )
+
+        if texto_atualizado != texto_original:
+            paragrafo.text = texto_atualizado
+
+        return quantidade
+
+    def _atualizar_celula(
+        self,
+        celula: _Cell,
+        substituicoes: dict[str, str],
+    ) -> int:
+        """
+        Atualiza as substituições nos parágrafos de uma célula.
+        """
+
+        quantidade = 0
+
+        for paragrafo in celula.paragraphs:
+            quantidade += self._atualizar_paragrafo(
+                paragrafo,
+                substituicoes,
+            )
+
+        return quantidade
+
     def atualizar_datas(
         self,
         documento: DocxDocument,
         substituicoes: dict[str, str],
     ) -> int:
         """
-        Substitui datas nos parágrafos do documento.
+        Substitui datas nos parágrafos e tabelas do documento.
 
         Args:
             documento: Documento Word aberto.
@@ -84,31 +166,29 @@ class TextUpdater:
 
         quantidade = 0
 
-        self.logger.info("Iniciando atualização das datas.")
+        self.logger.info(
+            "Iniciando atualização das datas."
+        )
 
+        # Atualiza parágrafos normais.
         for paragrafo in documento.paragraphs:
-            texto_original = paragrafo.text
+            quantidade += self._atualizar_paragrafo(
+                paragrafo,
+                substituicoes,
+            )
 
-            if not texto_original.strip():
-                continue
-
-            texto_atualizado = texto_original
-
-            for data_antiga, data_nova in substituicoes.items():
-                ocorrencias = texto_atualizado.count(data_antiga)
-
-                if ocorrencias:
-                    texto_atualizado = texto_atualizado.replace(
-                        data_antiga,
-                        data_nova,
+        # Atualiza células das tabelas.
+        for tabela in documento.tables:
+            for linha in tabela.rows:
+                for celula in linha.cells:
+                    quantidade += self._atualizar_celula(
+                        celula,
+                        substituicoes,
                     )
-                    quantidade += ocorrencias
-
-            if texto_atualizado != texto_original:
-                paragrafo.text = texto_atualizado
 
         self.logger.info(
-            "Atualização concluída. %d substituição(ões) realizada(s).",
+            "Atualização concluída. "
+            "%d substituição(ões) realizada(s).",
             quantidade,
         )
 
@@ -122,7 +202,7 @@ class TextUpdater:
     ) -> int:
         """
         Atualiza automaticamente o ano das datas existentes
-        nos parágrafos do documento.
+        nos parágrafos e tabelas do documento.
 
         Args:
             documento: Documento Word aberto.
@@ -141,21 +221,20 @@ class TextUpdater:
             ano_destino,
         )
 
-        for paragrafo in documento.paragraphs:
-            texto_original = paragrafo.text
+        def atualizar_texto(
+            texto: str,
+        ) -> tuple[str, int]:
+            """Atualiza as datas encontradas em um texto."""
 
-            if not texto_original.strip():
-                continue
+            texto_atualizado = texto
+            quantidade_local = 0
 
-            datas = DateParser.encontrar_datas(texto_original)
-
-            if not datas:
-                continue
-
-            texto_atualizado = texto_original
+            datas = DateParser.encontrar_datas(texto)
 
             for data in datas:
-                data_convertida = DateParser.converter_data(data)
+                data_convertida = (
+                    DateParser.converter_data(data)
+                )
 
                 if data_convertida is None:
                     continue
@@ -174,14 +253,57 @@ class TextUpdater:
                 ocorrencias = texto_atualizado.count(data)
 
                 if ocorrencias:
-                    texto_atualizado = texto_atualizado.replace(
-                        data,
-                        nova_data,
+                    texto_atualizado = (
+                        texto_atualizado.replace(
+                            data,
+                            nova_data,
+                        )
                     )
-                    quantidade += ocorrencias
+
+                    quantidade_local += ocorrencias
+
+            return texto_atualizado, quantidade_local
+
+        # -----------------------------------------------------
+        # PARÁGRAFOS
+        # -----------------------------------------------------
+
+        for paragrafo in documento.paragraphs:
+            texto_original = paragrafo.text
+
+            if not texto_original.strip():
+                continue
+
+            texto_atualizado, quantidade_local = (
+                atualizar_texto(texto_original)
+            )
 
             if texto_atualizado != texto_original:
                 paragrafo.text = texto_atualizado
+
+            quantidade += quantidade_local
+
+        # -----------------------------------------------------
+        # TABELAS
+        # -----------------------------------------------------
+
+        for tabela in documento.tables:
+            for linha in tabela.rows:
+                for celula in linha.cells:
+                    for paragrafo in celula.paragraphs:
+                        texto_original = paragrafo.text
+
+                        if not texto_original.strip():
+                            continue
+
+                        texto_atualizado, quantidade_local = (
+                            atualizar_texto(texto_original)
+                        )
+
+                        if texto_atualizado != texto_original:
+                            paragrafo.text = texto_atualizado
+
+                        quantidade += quantidade_local
 
         self.logger.info(
             "Atualização automática concluída. "

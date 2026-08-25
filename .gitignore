@@ -56,3 +56,9 @@ output/
 # Arquivos compilados
 *.pyd
 *.pyo
+
+# Documentos gerados pelos testes
+modelos/teste_integridade.docx
+modelos/teste_integridade_atualizado.docx
+modelos/teste_text_updater_tabelas.docx
+modelos/teste_text_updater_tabelas_atualizado.docx
