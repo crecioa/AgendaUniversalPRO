@@ -1,4 +1,4 @@
-"""
+﻿"""
 Agenda Universal PRO
 Arquivo: services/agenda_application.py
 
@@ -18,6 +18,8 @@ class AgendaApplication:
     """Coordena os principais fluxos de atualização da agenda."""
 
     def __init__(self) -> None:
+        """Inicializa a camada de aplicação."""
+
         self.logger = LoggerService.get_logger()
         self.agenda_updater = AgendaUpdater()
 
@@ -28,18 +30,7 @@ class AgendaApplication:
         ano_destino: int,
         destino: str | Path,
     ) -> int:
-        """
-        Atualiza automaticamente o ano de uma agenda.
-
-        Args:
-            arquivo: Documento Word original.
-            ano_origem: Ano atual das datas.
-            ano_destino: Novo ano das datas.
-            destino: Caminho do documento atualizado.
-
-        Returns:
-            Quantidade de datas atualizadas.
-        """
+        """Atualiza automaticamente o ano das datas de uma agenda."""
 
         self.logger.info(
             "Aplicação: iniciando atualização de ano."
@@ -66,18 +57,7 @@ class AgendaApplication:
         substituicoes: dict[str, str],
         destino: str | Path,
     ) -> int:
-        """
-        Atualiza datas específicas de uma agenda.
-
-        Args:
-            arquivo: Documento Word original.
-            substituicoes: Dicionário no formato:
-                {"data_antiga": "data_nova"}
-            destino: Caminho do documento atualizado.
-
-        Returns:
-            Quantidade de substituições realizadas.
-        """
+        """Atualiza datas específicas de uma agenda."""
 
         self.logger.info(
             "Aplicação: iniciando atualização de datas."

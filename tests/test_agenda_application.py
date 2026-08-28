@@ -1,4 +1,4 @@
-"""
+﻿"""
 Agenda Universal PRO
 Arquivo: tests/test_agenda_application.py
 
@@ -46,9 +46,7 @@ def criar_documento_teste(arquivo: Path) -> None:
     documento.save(str(arquivo))
 
 
-def validar_documento(
-    arquivo: Path,
-) -> None:
+def validar_documento(arquivo: Path) -> None:
     """Valida o conteúdo do documento atualizado."""
 
     documento = Document(str(arquivo))
@@ -91,6 +89,7 @@ def main() -> None:
     )
 
     pasta_modelos = Path("modelos")
+
     pasta_modelos.mkdir(
         parents=True,
         exist_ok=True,
