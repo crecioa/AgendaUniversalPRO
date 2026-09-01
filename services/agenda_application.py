@@ -30,7 +30,18 @@ class AgendaApplication:
         ano_destino: int,
         destino: str | Path,
     ) -> int:
-        """Atualiza automaticamente o ano das datas de uma agenda."""
+        """
+        Atualiza automaticamente o ano das datas de uma agenda.
+
+        Args:
+            arquivo: Documento Word original.
+            ano_origem: Ano atual das datas.
+            ano_destino: Novo ano das dados.
+            destino: Caminho do documento atualizado.
+
+        Returns:
+            Quantidade de datas atualizadas.
+        """
 
         self.logger.info(
             "Aplicação: iniciando atualização de ano."
@@ -57,7 +68,18 @@ class AgendaApplication:
         substituicoes: dict[str, str],
         destino: str | Path,
     ) -> int:
-        """Atualiza datas específicas de uma agenda."""
+        """
+        Atualiza datas específicas de uma agenda.
+
+        Args:
+            arquivo: Documento Word original.
+            substituicoes: Dicionário no formato
+                {"data_antiga": "data_nova"}.
+            destino: Caminho do documento atualizado.
+
+        Returns:
+            Quantidade de substituições realizadas.
+        """
 
         self.logger.info(
             "Aplicação: iniciando atualização de datas."
