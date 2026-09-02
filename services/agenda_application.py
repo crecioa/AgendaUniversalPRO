@@ -12,6 +12,7 @@ from pathlib import Path
 
 from core.agenda_updater import AgendaUpdater
 from services.logger_service import LoggerService
+from config.agenda_config import AgendaConfig
 
 
 class AgendaApplication:
@@ -94,6 +95,40 @@ class AgendaApplication:
         self.logger.info(
             "Aplicação: atualização concluída. "
             "%d substituição(ões) realizada(s).",
+            quantidade,
+        )
+
+        return quantidade
+
+    def atualizar(
+        self,
+        config: AgendaConfig,
+    ) -> int:
+        """
+        Atualiza uma agenda utilizando uma configuração.
+
+        Args:
+            config: Configuração da atualização da agenda.
+
+        Returns:
+            Quantidade de datas atualizadas.
+        """
+
+        self.logger.info(
+            "Aplicação: iniciando atualização "
+            "utilizando configuração."
+        )
+
+        quantidade = self.atualizar_ano(
+            arquivo=config.arquivo_origem,
+            ano_origem=config.ano_origem,
+            ano_destino=config.ano_destino,
+            destino=config.arquivo_destino,
+        )
+
+        self.logger.info(
+            "Aplicação: atualização por configuração "
+            "concluída. %d substituição(ões) realizada(s).",
             quantidade,
         )
 
