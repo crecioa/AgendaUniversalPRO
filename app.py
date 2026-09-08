@@ -4,11 +4,14 @@ Arquivo: app.py
 
 Ponto de entrada principal da aplicação.
 
-Sprint 3.6:
-- Menu interativo.
-- Leitura e validação das configurações.
-- Tratamento amigável de erros.
-- Execução da atualização de agendas.
+Sprint 3.7:
+
+* Menu interativo.
+* Validação dos dados informados.
+* Resumo da configuração.
+* Confirmação da atualização.
+* Cancelamento seguro.
+* Proteção contra sobrescrita de arquivos.
 """
 
 from __future__ import annotations
@@ -27,7 +30,6 @@ from services.logger_service import LoggerService
 
 def exibir_cabecalho() -> None:
     """Exibe o cabeçalho principal da aplicação."""
-
     print()
     print("=" * 60)
     print(f"{APP_NAME} v{APP_VERSION}")
@@ -37,7 +39,6 @@ def exibir_cabecalho() -> None:
 
 def exibir_menu() -> None:
     """Exibe o menu principal da aplicação."""
-
     print("MENU PRINCIPAL")
     print()
     print("1 - Atualizar agenda para um novo ano")
@@ -47,7 +48,6 @@ def exibir_menu() -> None:
 
 def ler_ano(mensagem: str) -> int:
     """Solicita e valida um ano informado pelo usuário."""
-
     while True:
         valor = input(mensagem).strip()
 
@@ -55,21 +55,24 @@ def ler_ano(mensagem: str) -> int:
             ano = int(valor)
 
             if ano < 1:
+                print()
                 print("Informe um ano válido.")
+                print()
                 continue
 
             return ano
 
         except ValueError:
+            print()
             print(
                 "Valor inválido. "
                 "Informe o ano utilizando apenas números."
             )
+            print()
 
 
 def ler_arquivo_origem() -> Path:
     """Solicita e valida o arquivo de origem."""
-
     while True:
         caminho = Path(
             input(
@@ -79,7 +82,9 @@ def ler_arquivo_origem() -> Path:
 
         if not caminho.exists():
             print()
-            print("Erro: o arquivo informado não existe.")
+            print(
+                "Erro: o arquivo informado não existe."
+            )
             print()
             continue
 
@@ -104,9 +109,36 @@ def ler_arquivo_origem() -> Path:
         return caminho
 
 
-def ler_arquivo_destino() -> Path:
-    """Solicita e valida o caminho do arquivo de destino."""
+def confirmar_sobrescrita(caminho: Path) -> bool:
+    """Solicita confirmação para sobrescrever um arquivo."""
+    print()
+    print(
+        "O arquivo de destino já existe:"
+    )
+    print(caminho)
+    print()
 
+    while True:
+        resposta = input(
+            "Deseja sobrescrever o arquivo? (S/N): "
+        ).strip().upper()
+
+        if resposta == "S":
+            return True
+
+        if resposta == "N":
+            return False
+
+        print()
+        print(
+            "Resposta inválida. "
+            "Digite S para confirmar ou N para cancelar."
+        )
+        print()
+
+
+def ler_arquivo_destino() -> Path:
+    """Solicita, valida e protege o arquivo de destino."""
     while True:
         caminho = Path(
             input(
@@ -116,7 +148,9 @@ def ler_arquivo_destino() -> Path:
 
         if not caminho.name:
             print()
-            print("Erro: informe um caminho válido.")
+            print(
+                "Erro: informe um caminho válido."
+            )
             print()
             continue
 
@@ -129,12 +163,25 @@ def ler_arquivo_destino() -> Path:
             print()
             continue
 
+        if caminho.exists():
+            if confirmar_sobrescrita(
+                caminho
+            ):
+                return caminho
+
+            print()
+            print(
+                "Informe outro arquivo de destino."
+            )
+            print()
+
+            continue
+
         return caminho
 
 
 def ler_configuracao() -> AgendaConfig:
     """Solicita os dados necessários para atualizar uma agenda."""
-
     print()
     print("CONFIGURAÇÃO DA ATUALIZAÇÃO")
     print("-" * 60)
@@ -170,31 +217,112 @@ def ler_configuracao() -> AgendaConfig:
     )
 
 
+def exibir_resumo_configuracao(
+    config: AgendaConfig,
+) -> None:
+    """Exibe um resumo da atualização configurada."""
+    print()
+    print("RESUMO DA ATUALIZAÇÃO")
+    print("-" * 60)
+
+    print(
+        f"Arquivo de origem: "
+        f"{config.arquivo_origem}"
+    )
+
+    print(
+        f"Arquivo de destino: "
+        f"{config.arquivo_destino}"
+    )
+
+    print(
+        f"Ano de origem: "
+        f"{config.ano_origem}"
+    )
+
+    print(
+        f"Ano de destino: "
+        f"{config.ano_destino}"
+    )
+
+    print("-" * 60)
+    print()
+
+
+def confirmar_atualizacao() -> bool:
+    """Solicita confirmação do usuário para iniciar a atualização."""
+    while True:
+        resposta = input(
+            "Deseja confirmar a atualização? (S/N): "
+        ).strip().upper()
+
+        if resposta == "S":
+            return True
+
+        if resposta == "N":
+            return False
+
+        print()
+        print(
+            "Resposta inválida. "
+            "Digite S para confirmar ou N para cancelar."
+        )
+        print()
+
+
 def executar_atualizacao(
     aplicacao: AgendaApplication,
 ) -> None:
     """Executa o processo de atualização da agenda."""
-
     logger = LoggerService.get_logger()
 
     try:
         config = ler_configuracao()
 
+        exibir_resumo_configuracao(
+            config
+        )
+
+        if not confirmar_atualizacao():
+            print()
+            print(
+                "Atualização cancelada pelo usuário."
+            )
+
+            logger.info(
+                "Atualização cancelada pelo usuário."
+            )
+
+            print()
+
+            return
+
         print()
-        print("Iniciando atualização da agenda...")
+        print(
+            "Iniciando atualização da agenda..."
+        )
         print()
 
-        quantidade = aplicacao.atualizar(config)
+        quantidade = aplicacao.atualizar(
+            config
+        )
 
         print()
         print("=" * 60)
-        print("Atualização concluída com sucesso.")
         print(
-            f"Substituições realizadas: {quantidade}"
+            "Atualização concluída com sucesso."
         )
+
         print(
-            f"Arquivo gerado: {config.arquivo_destino}"
+            f"Substituições realizadas: "
+            f"{quantidade}"
         )
+
+        print(
+            f"Arquivo gerado: "
+            f"{config.arquivo_destino}"
+        )
+
         print("=" * 60)
         print()
 
@@ -223,32 +351,36 @@ def executar_atualizacao(
             "Ocorreu um erro inesperado durante "
             "a atualização."
         )
+
         print(
             "Consulte o arquivo de log para "
             "mais detalhes."
         )
+
         print()
 
 
 def main() -> None:
     """Executa o fluxo principal da aplicação."""
-
     create_directories()
 
     logger = LoggerService.get_logger()
 
     logger.info("=" * 60)
+
     logger.info(
         "%s v%s iniciado.",
         APP_NAME,
         APP_VERSION,
     )
+
     logger.info("=" * 60)
 
     aplicacao = AgendaApplication()
 
     while True:
         exibir_cabecalho()
+
         exibir_menu()
 
         opcao = input(
@@ -256,7 +388,9 @@ def main() -> None:
         ).strip()
 
         if opcao == "1":
-            executar_atualizacao(aplicacao)
+            executar_atualizacao(
+                aplicacao
+            )
 
             input(
                 "Pressione ENTER para voltar ao menu..."
@@ -264,7 +398,9 @@ def main() -> None:
 
         elif opcao == "0":
             print()
-            print("Encerrando o programa...")
+            print(
+                "Encerrando o programa..."
+            )
 
             logger.info(
                 "Agenda Universal PRO encerrado."
