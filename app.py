@@ -4,7 +4,7 @@ Arquivo: app.py
 
 Ponto de entrada principal da aplicação.
 
-Sprint 3.7:
+Sprint 3.8:
 
 * Menu interativo.
 * Validação dos dados informados.
@@ -12,6 +12,8 @@ Sprint 3.7:
 * Confirmação da atualização.
 * Cancelamento seguro.
 * Proteção contra sobrescrita de arquivos.
+* Criação automática do diretório de destino.
+* Proteção contra origem e destino iguais.
 """
 
 from __future__ import annotations
@@ -74,11 +76,19 @@ def ler_ano(mensagem: str) -> int:
 def ler_arquivo_origem() -> Path:
     """Solicita e valida o arquivo de origem."""
     while True:
-        caminho = Path(
-            input(
-                "Informe o caminho do arquivo de origem: "
-            ).strip()
-        )
+        valor = input(
+            "Informe o caminho do arquivo de origem: "
+        ).strip()
+
+        if not valor:
+            print()
+            print(
+                "Erro: informe o caminho do arquivo de origem."
+            )
+            print()
+            continue
+
+        caminho = Path(valor)
 
         if not caminho.exists():
             print()
@@ -137,14 +147,55 @@ def confirmar_sobrescrita(caminho: Path) -> bool:
         print()
 
 
-def ler_arquivo_destino() -> Path:
-    """Solicita, valida e protege o arquivo de destino."""
-    while True:
-        caminho = Path(
-            input(
-                "Informe o caminho do arquivo de destino: "
-            ).strip()
+def criar_diretorio_destino(caminho: Path) -> None:
+    """Cria o diretório de destino quando necessário."""
+    diretorio = caminho.parent
+
+    if diretorio == Path("."):
+        return
+
+    diretorio.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+def caminhos_sao_iguais(
+    arquivo_origem: Path,
+    arquivo_destino: Path,
+) -> bool:
+    """Verifica se origem e destino representam o mesmo arquivo."""
+    try:
+        return (
+            arquivo_origem.resolve()
+            == arquivo_destino.resolve()
         )
+
+    except OSError:
+        return (
+            arquivo_origem.absolute()
+            == arquivo_destino.absolute()
+        )
+
+
+def ler_arquivo_destino(
+    arquivo_origem: Path,
+) -> Path:
+    """Solicita, valida e prepara o arquivo de destino."""
+    while True:
+        valor = input(
+            "Informe o caminho do arquivo de destino: "
+        ).strip()
+
+        if not valor:
+            print()
+            print(
+                "Erro: informe o caminho do arquivo de destino."
+            )
+            print()
+            continue
+
+        caminho = Path(valor)
 
         if not caminho.name:
             print()
@@ -163,10 +214,25 @@ def ler_arquivo_destino() -> Path:
             print()
             continue
 
+        if caminhos_sao_iguais(
+            arquivo_origem,
+            caminho,
+        ):
+            print()
+            print(
+                "Erro: o arquivo de destino não pode ser "
+                "o mesmo arquivo de origem."
+            )
+            print()
+            continue
+
         if caminho.exists():
             if confirmar_sobrescrita(
                 caminho
             ):
+                criar_diretorio_destino(
+                    caminho
+                )
                 return caminho
 
             print()
@@ -174,8 +240,9 @@ def ler_arquivo_destino() -> Path:
                 "Informe outro arquivo de destino."
             )
             print()
-
             continue
+
+        criar_diretorio_destino(caminho)
 
         return caminho
 
@@ -187,7 +254,10 @@ def ler_configuracao() -> AgendaConfig:
     print("-" * 60)
 
     arquivo_origem = ler_arquivo_origem()
-    arquivo_destino = ler_arquivo_destino()
+
+    arquivo_destino = ler_arquivo_destino(
+        arquivo_origem
+    )
 
     ano_origem = ler_ano(
         "Informe o ano de origem: "
@@ -250,7 +320,7 @@ def exibir_resumo_configuracao(
 
 
 def confirmar_atualizacao() -> bool:
-    """Solicita confirmação do usuário para iniciar a atualização."""
+    """Solicita confirmação para iniciar a atualização."""
     while True:
         resposta = input(
             "Deseja confirmar a atualização? (S/N): "
@@ -331,6 +401,7 @@ def executar_atualizacao(
         FileExistsError,
         PermissionError,
         ValueError,
+        OSError,
     ) as erro:
         logger.error(
             "Erro durante a atualização: %s",
