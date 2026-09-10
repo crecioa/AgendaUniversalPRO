@@ -1,25 +1,37 @@
-﻿"""ServiÃ§o de configuraÃ§Ã£o da Agenda Universal PRO.
+﻿"""
+Agenda Universal PRO
+Arquivo: services/config_service.py
 
-ResponsÃ¡vel pelo carregamento e salvamento das configuraÃ§Ãµes persistentes
-da aplicaÃ§Ã£o.
+Serviço responsável pelo carregamento e salvamento das configurações
+persistentes da aplicação.
 
-Sprint 4.1: persistÃªncia de configuraÃ§Ãµes em JSON.
+Sprint 4.4:
+- Mantém a persistência em JSON.
+- Garante valores padrão para configurações inválidas.
+- Trata arquivos JSON incompletos ou inválidos com segurança.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from config.app_config import AppConfig
 
+
 class ConfigService:
-    """Gerencia as configuraÃ§Ãµes persistentes da aplicaÃ§Ã£o."""
+    """Gerencia as configurações persistentes da aplicação."""
+
+    DIRETORIO_ORIGEM_PADRAO = Path("modelos")
+    DIRETORIO_DESTINO_PADRAO = Path("output")
 
     def __init__(
         self,
         arquivo_config: Path | None = None,
     ) -> None:
+        """Inicializa o serviço de configuração."""
+
         if arquivo_config is None:
             arquivo_config = (
                 Path("data") / "app_config.json"
@@ -28,44 +40,47 @@ class ConfigService:
         self.arquivo_config = arquivo_config
 
     def carregar(self) -> AppConfig:
-        """Carrega as configuraÃ§Ãµes persistentes."""
+        """Carrega as configurações persistentes."""
 
         if not self.arquivo_config.exists():
-            return AppConfig()
+            return self._configuracao_padrao()
 
         try:
             with self.arquivo_config.open(
                 "r",
                 encoding="utf-8",
             ) as arquivo:
-                dados = json.load(arquivo)
+                dados: Any = json.load(arquivo)
+
+            if not isinstance(dados, dict):
+                return self._configuracao_padrao()
+
+            diretorio_origem = self._obter_diretorio(
+                dados.get("diretorio_origem"),
+                self.DIRETORIO_ORIGEM_PADRAO,
+            )
+
+            diretorio_destino = self._obter_diretorio(
+                dados.get("diretorio_destino"),
+                self.DIRETORIO_DESTINO_PADRAO,
+            )
 
             return AppConfig(
-                diretorio_origem=Path(
-                    dados.get(
-                        "diretorio_origem",
-                        "modelos",
-                    )
-                ),
-                diretorio_destino=Path(
-                    dados.get(
-                        "diretorio_destino",
-                        "output",
-                    )
-                ),
+                diretorio_origem=diretorio_origem,
+                diretorio_destino=diretorio_destino,
             )
 
         except (
             json.JSONDecodeError,
             OSError,
         ):
-            return AppConfig()
+            return self._configuracao_padrao()
 
     def salvar(
         self,
         config: AppConfig,
     ) -> None:
-        """Salva as configuraÃ§Ãµes persistentemente."""
+        """Salva as configurações persistentemente."""
 
         self.arquivo_config.parent.mkdir(
             parents=True,
@@ -90,7 +105,30 @@ class ConfigService:
                 arquivo,
                 ensure_ascii=False,
                 indent=4,
-
             )
 
+    @classmethod
+    def _configuracao_padrao(cls) -> AppConfig:
+        """Retorna uma configuração padrão segura."""
 
+        return AppConfig(
+            diretorio_origem=cls.DIRETORIO_ORIGEM_PADRAO,
+            diretorio_destino=cls.DIRETORIO_DESTINO_PADRAO,
+        )
+
+    @staticmethod
+    def _obter_diretorio(
+        valor: Any,
+        valor_padrao: Path,
+    ) -> Path:
+        """Converte um valor válido em Path ou retorna o padrão."""
+
+        if not isinstance(valor, str):
+            return valor_padrao
+
+        valor_limpo = valor.strip()
+
+        if not valor_limpo:
+            return valor_padrao
+
+        return Path(valor_limpo)
