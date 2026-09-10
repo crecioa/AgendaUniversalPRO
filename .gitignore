@@ -2,7 +2,7 @@
 # Agenda Universal PRO
 # .gitignore
 # ==========================================================
-
+data/app_config.json
 # Ambiente virtual
 .venv/
 venv/
