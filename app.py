@@ -1,255 +1,205 @@
-"""
-Agenda Universal PRO
-Arquivo: app.py
-
-Ponto de entrada principal da aplicação.
-
-Sprint 3.9:
-
-* Menu interativo.
-* Validação dos dados informados.
-* Resumo da configuração.
-* Confirmação da atualização.
-* Cancelamento seguro.
-* Proteção contra sobrescrita de arquivos.
-* Criação automática do diretório de destino.
-* Proteção contra origem e destino iguais.
-* Listagem de arquivos disponíveis na pasta modelos.
-* Seleção interativa do arquivo de origem.
-* Possibilidade de informar o caminho manualmente.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
 
 from config.agenda_config import AgendaConfig
-from config.settings import (
-    APP_NAME,
-    APP_VERSION,
-    create_directories,
-)
+from config.app_config import AppConfig
+from config.settings import create_directories
 from services.agenda_application import AgendaApplication
+from services.config_service import ConfigService
 from services.logger_service import LoggerService
 
-
-def exibir_cabecalho() -> None:
-    """Exibe o cabeçalho principal da aplicação."""
-    print()
-    print("=" * 60)
-    print(f"{APP_NAME} v{APP_VERSION}")
-    print("=" * 60)
-    print()
+logger = LoggerService.get_logger()
 
 
-def exibir_menu() -> None:
-    """Exibe o menu principal da aplicação."""
-    print("MENU PRINCIPAL")
-    print()
-    print("1 - Atualizar agenda para um novo ano")
-    print("0 - Sair")
-    print()
+def listar_arquivos_modelos(
+    diretorio_origem: Path,
+) -> list[Path]:
+    """Lista os arquivos DOCX disponíveis no diretório de origem."""
+    if not diretorio_origem.exists():
+        return []
 
-
-def ler_ano(mensagem: str) -> int:
-    """Solicita e valida um ano informado pelo usuário."""
-    while True:
-        valor = input(mensagem).strip()
-
-        try:
-            ano = int(valor)
-
-            if ano < 1:
-                print()
-                print("Informe um ano válido.")
-                print()
-                continue
-
-            return ano
-
-        except ValueError:
-            print()
-            print(
-                "Valor inválido. "
-                "Informe o ano utilizando apenas números."
-            )
-            print()
-
-
-def listar_arquivos_modelos() -> list[Path]:
-    """Retorna os arquivos DOCX disponíveis na pasta modelos."""
-    pasta_modelos = Path("modelos")
-
-    if not pasta_modelos.exists():
+    if not diretorio_origem.is_dir():
         return []
 
     arquivos = [
         arquivo
-        for arquivo in pasta_modelos.glob("*.docx")
-        if arquivo.is_file() and not arquivo.name.startswith("~$")
+        for arquivo in diretorio_origem.glob("*.docx")
+        if arquivo.is_file()
+        and not arquivo.name.startswith("~$")
     ]
 
     return sorted(arquivos)
 
 
-def exibir_arquivos_modelos(arquivos: list[Path]) -> None:
-    """Exibe os arquivos disponíveis para seleção."""
+def selecionar_arquivo_modelo(
+    diretorio_origem: Path,
+) -> Path | None:
+    """Permite selecionar um arquivo DOCX ou cancelar a operação."""
+    arquivos = listar_arquivos_modelos(diretorio_origem)
+
     print()
-    print("ARQUIVOS DISPONÍVEIS")
+    print("ARQUIVOS DE MODELO")
     print("-" * 60)
 
-    for indice, arquivo in enumerate(arquivos, start=1):
-        print(f"{indice} - {arquivo.name}")
-
-    print()
-    print("M - Informar um caminho manualmente")
-    print("0 - Voltar")
-    print()
-
-
-def selecionar_arquivo_modelo() -> Path | None:
-    """Permite selecionar um arquivo disponível na pasta modelos."""
-    arquivos = listar_arquivos_modelos()
-
     if not arquivos:
-        return None
+        print(
+            f"Nenhum arquivo DOCX encontrado em: "
+            f"{diretorio_origem}"
+        )
+    else:
+        for indice, arquivo in enumerate(arquivos, start=1):
+            print(f"{indice} - {arquivo.name}")
+
+    print()
+    print("M - Informar outro arquivo manualmente")
+    print("0 - Voltar")
 
     while True:
-        exibir_arquivos_modelos(arquivos)
-
-        escolha = input("Escolha o arquivo de origem: ").strip()
+        escolha = input("\nEscolha uma opção: ").strip()
 
         if escolha == "0":
             return None
 
         if escolha.upper() == "M":
-            return Path(
-                input("Informe o caminho do arquivo de origem: ").strip()
-            )
+            caminho = input(
+                "Informe o caminho completo do arquivo DOCX: "
+            ).strip()
 
-        try:
+            if not caminho:
+                print("Caminho não informado.")
+                continue
+
+            arquivo = Path(caminho)
+
+            if not arquivo.exists():
+                print("Arquivo não encontrado.")
+                continue
+
+            if not arquivo.is_file():
+                print("O caminho informado não é um arquivo.")
+                continue
+
+            if arquivo.suffix.lower() != ".docx":
+                print("O arquivo precisa ter extensão .docx.")
+                continue
+
+            return arquivo
+
+        if escolha.isdigit():
             indice = int(escolha)
 
             if 1 <= indice <= len(arquivos):
                 return arquivos[indice - 1]
 
-            print()
-            print("Opção inválida. Escolha um número da lista.")
-            print()
-
-        except ValueError:
-            print()
-            print("Opção inválida. Informe um número, M ou 0.")
-            print()
+        print("Opção inválida. Tente novamente.")
 
 
-def validar_arquivo_origem(caminho: Path) -> Path | None:
-    """Valida um arquivo informado como origem."""
-    if not caminho.exists():
+def ler_arquivo_origem(
+    diretorio_origem: Path,
+) -> Path | None:
+    """Obtém o arquivo de origem da atualização."""
+    if not diretorio_origem.exists():
         print()
-        print("Erro: o arquivo informado não existe.")
+        print(
+            f"O diretório de origem não existe: "
+            f"{diretorio_origem}"
+        )
         print()
         return None
 
-    if not caminho.is_file():
+    if not diretorio_origem.is_dir():
         print()
-        print("Erro: o caminho informado não corresponde a um arquivo.")
-        print()
-        return None
-
-    if caminho.suffix.lower() != ".docx":
-        print()
-        print("Erro: o arquivo deve possuir a extensão .docx.")
+        print(
+            f"O caminho de origem não é um diretório: "
+            f"{diretorio_origem}"
+        )
         print()
         return None
 
-    return caminho
+    return selecionar_arquivo_modelo(diretorio_origem)
 
 
-def ler_arquivo_origem() -> Path:
-    """Solicita e valida o arquivo de origem."""
-    while True:
-        caminho = selecionar_arquivo_modelo()
-
-        if caminho is None:
-            print()
-            print("Informe o caminho do arquivo de origem.")
-            print()
-            caminho = Path(input("Informe o caminho do arquivo de origem: ").strip())
-
-        arquivo = validar_arquivo_origem(caminho)
-
-        if arquivo is not None:
-            return arquivo
-
-
-def confirmar_sobrescrita(caminho: Path) -> bool:
-    """Solicita confirmação para sobrescrever um arquivo."""
+def ler_arquivo_destino(
+    diretorio_destino: Path,
+) -> Path | None:
+    """Obtém o nome do arquivo de destino."""
     print()
-    print("O arquivo de destino já existe:")
-    print(caminho)
+    print("ARQUIVO DE DESTINO")
+    print("-" * 60)
+    print(
+        f"Diretório de destino configurado: "
+        f"{diretorio_destino}"
+    )
     print()
+    print("Informe apenas o nome do arquivo.")
+    print("Exemplo: agenda_2027.docx")
+    print("0 - Voltar")
 
     while True:
-        resposta = input("Deseja sobrescrever o arquivo? (S/N): ").strip().upper()
+        nome_arquivo = input(
+            "\nNome do arquivo de destino: "
+        ).strip()
 
-        if resposta == "S":
-            return True
+        if nome_arquivo == "0":
+            return None
 
-        if resposta == "N":
-            return False
+        if not nome_arquivo:
+            print("Nome do arquivo não informado.")
+            continue
 
-        print()
-        print("Resposta inválida. Digite S para confirmar ou N para cancelar.")
-        print()
+        caminho = Path(nome_arquivo)
 
-
-def ler_arquivo_destino() -> Path:
-    """Solicita, valida e protege o arquivo de destino."""
-    while True:
-        caminho = Path(input("Informe o caminho do arquivo de destino: ").strip())
-
-        if not caminho.name:
-            print()
-            print("Erro: informe um caminho válido.")
-            print()
+        if caminho.name != nome_arquivo:
+            print(
+                "Informe somente o nome do arquivo, "
+                "sem outro diretório."
+            )
             continue
 
         if caminho.suffix.lower() != ".docx":
-            print()
-            print("Erro: o arquivo de destino deve possuir a extensão .docx.")
-            print()
+            print("O arquivo de destino precisa ser .docx.")
             continue
 
-        if caminho.exists():
-            if confirmar_sobrescrita(caminho):
-                return caminho
-
-            print()
-            print("Informe outro arquivo de destino.")
-            print()
-            continue
-
-        return caminho
+        return diretorio_destino / caminho.name
 
 
-def ler_configuracao() -> AgendaConfig:
-    """Solicita os dados necessários para atualizar uma agenda."""
+def ler_configuracao(
+    config_app: AppConfig,
+    arquivo_origem: Path,
+    arquivo_destino: Path,
+) -> AgendaConfig:
+    """Monta a configuração da atualização da agenda."""
     print()
     print("CONFIGURAÇÃO DA ATUALIZAÇÃO")
     print("-" * 60)
 
-    arquivo_origem = ler_arquivo_origem()
-    arquivo_destino = ler_arquivo_destino()
+    while True:
+        try:
+            ano_origem = int(
+                input("Informe o ano atual da agenda: ").strip()
+            )
+            break
+        except ValueError:
+            print("Informe um ano válido.")
 
-    ano_origem = ler_ano("Informe o ano de origem: ")
-    ano_destino = ler_ano("Informe o ano de destino: ")
+    while True:
+        try:
+            ano_destino = int(
+                input("Informe o novo ano da agenda: ").strip()
+            )
 
-    while ano_origem == ano_destino:
-        print()
-        print("O ano de destino deve ser diferente do ano de origem.")
-        print()
-        ano_destino = ler_ano("Informe novamente o ano de destino: ")
+            if ano_destino == ano_origem:
+                print(
+                    "O ano de origem e o ano de destino "
+                    "devem ser diferentes."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print("Informe um ano válido.")
 
     return AgendaConfig(
         arquivo_origem=arquivo_origem,
@@ -259,119 +209,331 @@ def ler_configuracao() -> AgendaConfig:
     )
 
 
-def exibir_resumo_configuracao(config: AgendaConfig) -> None:
-    """Exibe um resumo da atualização configurada."""
-    print()
-    print("RESUMO DA ATUALIZAÇÃO")
-    print("-" * 60)
+def executar_atualizacao(
+    aplicacao: AgendaApplication,
+    config_app: AppConfig,
+) -> None:
+    """Executa o processo completo de atualização."""
+    arquivo_origem = ler_arquivo_origem(
+        config_app.diretorio_origem
+    )
 
+    if arquivo_origem is None:
+        print()
+        print("Operação cancelada.")
+        return
+
+    arquivo_destino = ler_arquivo_destino(
+        config_app.diretorio_destino
+    )
+
+    if arquivo_destino is None:
+        print()
+        print("Operação cancelada.")
+        return
+
+    config = ler_configuracao(
+        config_app,
+        arquivo_origem,
+        arquivo_destino,
+    )
+
+    print()
+    print("CONFIGURAÇÃO SELECIONADA")
+    print("-" * 60)
     print(f"Arquivo de origem: {config.arquivo_origem}")
     print(f"Arquivo de destino: {config.arquivo_destino}")
     print(f"Ano de origem: {config.ano_origem}")
     print(f"Ano de destino: {config.ano_destino}")
-
     print("-" * 60)
-    print()
 
+    confirmar = input(
+        "Deseja iniciar a atualização? (S/N): "
+    ).strip().upper()
 
-def confirmar_atualizacao() -> bool:
-    """Solicita confirmação do usuário para iniciar a atualização."""
-    while True:
-        resposta = input("Deseja confirmar a atualização? (S/N): ").strip().upper()
-
-        if resposta == "S":
-            return True
-
-        if resposta == "N":
-            return False
-
+    if confirmar != "S":
         print()
-        print("Resposta inválida. Digite S para confirmar ou N para cancelar.")
-        print()
-
-
-def executar_atualizacao(aplicacao: AgendaApplication) -> None:
-    """Executa o processo de atualização da agenda."""
-    logger = LoggerService.get_logger()
+        print("Operação cancelada pelo usuário.")
+        return
 
     try:
-        config = ler_configuracao()
-
-        exibir_resumo_configuracao(config)
-
-        if not confirmar_atualizacao():
-            print()
-            print("Atualização cancelada pelo usuário.")
-            logger.info("Atualização cancelada pelo usuário.")
-            print()
-            return
-
         print()
         print("Iniciando atualização da agenda...")
-        print()
 
-        quantidade = aplicacao.atualizar(config)
+        resultado = aplicacao.atualizar(config)
 
         print()
-        print("=" * 60)
         print("Atualização concluída com sucesso.")
-        print(f"Substituições realizadas: {quantidade}")
-        print(f"Arquivo gerado: {config.arquivo_destino}")
-        print("=" * 60)
-        print()
 
-    except (
-        FileNotFoundError,
-        FileExistsError,
-        PermissionError,
-        ValueError,
-    ) as erro:
-        logger.error("Erro durante a atualização: %s", erro)
-        print()
-        print(f"Erro: {erro}")
-        print()
+        print(
+            f"Substituições realizadas: {resultado}"
+        )
+        print(
+            f"Arquivo gerado: {config.arquivo_destino}"
+        )
 
-    except Exception:
-        logger.exception("Erro inesperado durante a atualização.")
+    except Exception as exc:
+        logger.exception(
+            "Erro durante a atualização da agenda."
+        )
+
         print()
-        print("Ocorreu um erro inesperado durante a atualização.")
-        print("Consulte o arquivo de log para mais detalhes.")
+        print("ERRO DURANTE A ATUALIZAÇÃO")
+        print("-" * 60)
+        print(str(exc))
+        print("-" * 60)
+
+
+def exibir_configuracoes(
+    config_app: AppConfig,
+) -> None:
+    """Exibe as configurações persistentes atuais."""
+    print()
+    print("CONFIGURAÇÕES ATUAIS")
+    print("-" * 60)
+    print(
+        f"Diretório de origem: "
+        f"{config_app.diretorio_origem}"
+    )
+    print(
+        f"Diretório de destino: "
+        f"{config_app.diretorio_destino}"
+    )
+    print("-" * 60)
+
+
+def ler_novo_diretorio_origem() -> Path | None:
+    """Solicita e valida um novo diretório de origem."""
+    print()
+    print("ALTERAR DIRETÓRIO DE ORIGEM")
+    print("-" * 60)
+    print("0 - Cancelar")
+
+    while True:
+        entrada = input(
+            "\nInforme o novo diretório de origem: "
+        ).strip()
+
+        if entrada == "0":
+            return None
+
+        if not entrada:
+            print("Diretório não informado.")
+            continue
+
+        diretorio = Path(entrada)
+
+        if not diretorio.exists():
+            print(
+                "O diretório informado não existe."
+            )
+            continue
+
+        if not diretorio.is_dir():
+            print(
+                "O caminho informado não é um diretório."
+            )
+            continue
+
+        return diretorio
+
+
+def ler_novo_diretorio_destino() -> Path | None:
+    """Solicita e valida um novo diretório de destino."""
+    print()
+    print("ALTERAR DIRETÓRIO DE DESTINO")
+    print("-" * 60)
+    print("0 - Cancelar")
+
+    while True:
+        entrada = input(
+            "\nInforme o novo diretório de destino: "
+        ).strip()
+
+        if entrada == "0":
+            return None
+
+        if not entrada:
+            print("Diretório não informado.")
+            continue
+
+        diretorio = Path(entrada)
+
+        if diretorio.exists():
+            if not diretorio.is_dir():
+                print(
+                    "O caminho informado existe, "
+                    "mas não é um diretório."
+                )
+                continue
+
+            return diretorio
+
         print()
+        print(
+            f"O diretório '{diretorio}' ainda não existe."
+        )
+
+        criar = input(
+            "Deseja criá-lo? (S/N): "
+        ).strip().upper()
+
+        if criar != "S":
+            print("Diretório não alterado.")
+            continue
+
+        try:
+            diretorio.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            print(
+                f"Diretório criado: {diretorio}"
+            )
+
+            return diretorio
+
+        except OSError as exc:
+            print(
+                f"Não foi possível criar o diretório: "
+                f"{exc}"
+            )
+
+
+def alterar_configuracoes(
+    config_service: ConfigService,
+    config_app: AppConfig,
+) -> None:
+    """Permite alterar e salvar as configurações."""
+    while True:
+        exibir_configuracoes(config_app)
+
+        print()
+        print("1 - Alterar diretório de origem")
+        print("2 - Alterar diretório de destino")
+        print("0 - Voltar")
+
+        escolha = input(
+            "\nEscolha uma opção: "
+        ).strip()
+
+        if escolha == "0":
+            return
+
+        if escolha == "1":
+            novo_diretorio = (
+                ler_novo_diretorio_origem()
+            )
+
+            if novo_diretorio is None:
+                continue
+
+            config_app.diretorio_origem = novo_diretorio
+
+            config_service.salvar(config_app)
+
+            print()
+            print(
+                "Diretório de origem atualizado "
+                "com sucesso."
+            )
+            continue
+
+        if escolha == "2":
+            novo_diretorio = (
+                ler_novo_diretorio_destino()
+            )
+
+            if novo_diretorio is None:
+                continue
+
+            config_app.diretorio_destino = (
+                novo_diretorio
+            )
+
+            config_service.salvar(config_app)
+
+            print()
+            print(
+                "Diretório de destino atualizado "
+                "com sucesso."
+            )
+            continue
+
+        print()
+        print("Opção inválida.")
+
+
+def exibir_menu_principal() -> None:
+    """Exibe o menu principal."""
+    print()
+    print("MENU PRINCIPAL")
+    print()
+    print("1 - Atualizar agenda para um novo ano")
+    print("2 - Configurações")
+    print("0 - Sair")
 
 
 def main() -> None:
-    """Executa o fluxo principal da aplicação."""
+    """Ponto de entrada da aplicação."""
     create_directories()
 
-    logger = LoggerService.get_logger()
-
-    logger.info("=" * 60)
-    logger.info("%s v%s iniciado.", APP_NAME, APP_VERSION)
-    logger.info("=" * 60)
+    config_service = ConfigService()
+    config_app = config_service.carregar()
 
     aplicacao = AgendaApplication()
 
+    logger.info("=" * 60)
+    logger.info("Agenda Universal PRO iniciado.")
+    logger.info("=" * 60)
+
+    print()
+    print("=" * 60)
+    print("Agenda Universal PRO v1.0.0")
+    print("=" * 60)
+
     while True:
-        exibir_cabecalho()
-        exibir_menu()
+        exibir_menu_principal()
 
-        opcao = input("Escolha uma opção: ").strip()
+        escolha = input(
+            "\nEscolha uma opção: "
+        ).strip()
 
-        if opcao == "1":
-            executar_atualizacao(aplicacao)
-            input("Pressione ENTER para voltar ao menu...")
+        if escolha == "0":
+            logger.info(
+                "Agenda Universal PRO encerrado."
+            )
 
-        elif opcao == "0":
             print()
-            print("Encerrando o programa...")
-            logger.info("Agenda Universal PRO encerrado.")
+            print("Aplicação encerrada.")
             break
 
-        else:
-            print()
-            print("Opção inválida. Escolha uma opção do menu.")
-            input("Pressione ENTER para continuar...")
+        if escolha == "1":
+            executar_atualizacao(
+                aplicacao,
+                config_app,
+            )
+            continue
+
+        if escolha == "2":
+            alterar_configuracoes(
+                config_service,
+                config_app,
+            )
+            continue
+
+        print()
+        print("Opção inválida. Tente novamente.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        logger.exception("Erro durante a execução da aplicação.")
+        print()
+        print("ERRO DURANTE A EXECUÇÃO")
+        print("-" * 60)
+        print(str(exc))
+        print("-" * 60)
