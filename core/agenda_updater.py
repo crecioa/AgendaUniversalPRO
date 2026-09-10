@@ -24,7 +24,10 @@ class AgendaUpdater:
         self.backup_service = BackupService()
         self.text_updater = TextUpdater()
 
-    def abrir_agenda(self, arquivo: str | Path):
+    def abrir_agenda(
+        self,
+        arquivo: str | Path,
+    ):
         """
         Cria um backup, abre o documento Word e localiza as datas.
 
@@ -37,22 +40,40 @@ class AgendaUpdater:
 
         caminho = Path(arquivo)
 
-        self.logger.info("Iniciando processamento: %s", caminho.name)
-
-        self.backup_service.criar_backup(caminho)
-
-        documento = self.word_service.abrir_documento(caminho)
-
-        self.logger.info("Documento carregado com sucesso.")
-
-        ocorrencias = self.text_updater.localizar_datas(documento)
-
         self.logger.info(
-            "Processamento concluído. %d parágrafo(s) com datas.",
-            len(ocorrencias),
+            "Iniciando processamento: %s",
+            caminho.name,
         )
 
-        return documento
+        try:
+            self.backup_service.criar_backup(caminho)
+
+            documento = self.word_service.abrir_documento(
+                caminho
+            )
+
+            self.logger.info(
+                "Documento carregado com sucesso."
+            )
+
+            ocorrencias = self.text_updater.localizar_datas(
+                documento
+            )
+
+            self.logger.info(
+                "Processamento concluído. "
+                "%d parágrafo(s) com datas.",
+                len(ocorrencias),
+            )
+
+            return documento
+
+        except Exception:
+            self.logger.exception(
+                "Erro ao processar a agenda: %s",
+                caminho,
+            )
+            raise
 
     def atualizar_agenda(
         self,
@@ -81,34 +102,50 @@ class AgendaUpdater:
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
 
-        self._validar_arquivo_origem(caminho)
-        self._validar_destino(caminho, caminho_destino)
+        try:
+            self._validar_arquivo_origem(caminho)
+            self._validar_destino(
+                caminho,
+                caminho_destino,
+            )
 
-        self.logger.info(
-            "Iniciando atualização da agenda: %s",
-            caminho.name,
-        )
+            self.logger.info(
+                "Iniciando atualização da agenda: %s",
+                caminho.name,
+            )
 
-        self.backup_service.criar_backup(caminho)
+            self.backup_service.criar_backup(caminho)
 
-        documento = self.word_service.abrir_documento(caminho)
+            documento = self.word_service.abrir_documento(
+                caminho
+            )
 
-        quantidade = self.text_updater.atualizar_datas(
-            documento,
-            substituicoes,
-        )
+            quantidade = self.text_updater.atualizar_datas(
+                documento,
+                substituicoes,
+            )
 
-        self.word_service.salvar_documento(
-            documento,
-            caminho_destino,
-        )
+            self.word_service.salvar_documento(
+                documento,
+                caminho_destino,
+            )
 
-        self.logger.info(
-            "Agenda atualizada com sucesso. %d substituição(ões).",
-            quantidade,
-        )
+            self.logger.info(
+                "Agenda atualizada com sucesso. "
+                "%d substituição(ões).",
+                quantidade,
+            )
 
-        return quantidade
+            return quantidade
+
+        except Exception:
+            self.logger.exception(
+                "Erro ao atualizar a agenda. "
+                "Origem: %s | Destino: %s",
+                caminho,
+                caminho_destino,
+            )
+            raise
 
     def atualizar_ano(
         self,
@@ -141,42 +178,64 @@ class AgendaUpdater:
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
 
-        self._validar_arquivo_origem(caminho)
-        self._validar_anos(ano_origem, ano_destino)
-        self._validar_destino(caminho, caminho_destino)
+        try:
+            self._validar_arquivo_origem(caminho)
+            self._validar_anos(
+                ano_origem,
+                ano_destino,
+            )
+            self._validar_destino(
+                caminho,
+                caminho_destino,
+            )
 
-        self.logger.info(
-            "Iniciando atualização automática da agenda: %s",
-            caminho.name,
-        )
+            self.logger.info(
+                "Iniciando atualização automática da agenda: %s",
+                caminho.name,
+            )
 
-        self.backup_service.criar_backup(caminho)
+            self.backup_service.criar_backup(caminho)
 
-        documento = self.word_service.abrir_documento(caminho)
+            documento = self.word_service.abrir_documento(
+                caminho
+            )
 
-        quantidade = self.text_updater.atualizar_ano(
-            documento,
-            ano_origem,
-            ano_destino,
-        )
+            quantidade = self.text_updater.atualizar_ano(
+                documento,
+                ano_origem,
+                ano_destino,
+            )
 
-        self.word_service.salvar_documento(
-            documento,
-            caminho_destino,
-        )
+            self.word_service.salvar_documento(
+                documento,
+                caminho_destino,
+            )
 
-        self.logger.info(
-            "Agenda atualizada de %d para %d. "
-            "%d substituição(ões) realizada(s).",
-            ano_origem,
-            ano_destino,
-            quantidade,
-        )
+            self.logger.info(
+                "Agenda atualizada de %d para %d. "
+                "%d substituição(ões) realizada(s).",
+                ano_origem,
+                ano_destino,
+                quantidade,
+            )
 
-        return quantidade
+            return quantidade
+
+        except Exception:
+            self.logger.exception(
+                "Erro ao atualizar a agenda de %d para %d. "
+                "Origem: %s | Destino: %s",
+                ano_origem,
+                ano_destino,
+                caminho,
+                caminho_destino,
+            )
+            raise
 
     @staticmethod
-    def _validar_arquivo_origem(caminho: Path) -> None:
+    def _validar_arquivo_origem(
+        caminho: Path,
+    ) -> None:
         """Valida a existência do documento original."""
 
         if not caminho.exists():
@@ -219,18 +278,27 @@ class AgendaUpdater:
         """Valida os anos utilizados na atualização."""
 
         if not isinstance(ano_origem, int):
-            raise ValueError("O ano de origem deve ser um número inteiro.")
+            raise ValueError(
+                "O ano de origem deve ser um número inteiro."
+            )
 
         if not isinstance(ano_destino, int):
-            raise ValueError("O ano de destino deve ser um número inteiro.")
+            raise ValueError(
+                "O ano de destino deve ser um número inteiro."
+            )
 
         if ano_origem < 1 or ano_origem > 9999:
-            raise ValueError("O ano de origem deve estar entre 1 e 9999.")
+            raise ValueError(
+                "O ano de origem deve estar entre 1 e 9999."
+            )
 
         if ano_destino < 1 or ano_destino > 9999:
-            raise ValueError("O ano de destino deve estar entre 1 e 9999.")
+            raise ValueError(
+                "O ano de destino deve estar entre 1 e 9999."
+            )
 
         if ano_origem == ano_destino:
             raise ValueError(
-                "O ano de origem e o ano de destino não podem ser iguais."
+                "O ano de origem e o ano de destino "
+                "não podem ser iguais."
             )
