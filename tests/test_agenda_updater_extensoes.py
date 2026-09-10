@@ -12,27 +12,33 @@ from docx import Document
 from core.agenda_updater import AgendaUpdater
 
 
-ARQUIVO_TESTE = Path("modelos") / "teste_extensoes_agenda.docx"
-DESTINO_TESTE = Path("modelos") / "teste_extensoes_agenda_atualizada.docx"
-
-
-def criar_documento_teste() -> None:
+def criar_documento_teste(
+    arquivo: Path,
+) -> None:
     """Cria um documento Word utilizado pelos testes."""
+
+    arquivo.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     documento = Document()
 
     documento.add_paragraph("Agenda Universal PRO")
     documento.add_paragraph("Audiência em 05/01/2026.")
 
-    documento.save(str(ARQUIVO_TESTE))
+    documento.save(str(arquivo))
 
 
-def testar_extensao_origem() -> None:
+def testar_extensao_origem(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de arquivo de origem sem .docx."""
 
     updater = AgendaUpdater()
 
-    arquivo = Path("modelos") / "documento.txt"
+    arquivo = tmp_path / "documento.txt"
+    destino = tmp_path / "destino.docx"
 
     arquivo.write_text(
         "arquivo de teste",
@@ -44,7 +50,7 @@ def testar_extensao_origem() -> None:
             arquivo,
             2026,
             2027,
-            DESTINO_TESTE,
+            destino,
         )
     except ValueError:
         print("✓ Extensão da origem rejeitada corretamente.")
@@ -56,16 +62,21 @@ def testar_extensao_origem() -> None:
         arquivo.unlink(missing_ok=True)
 
 
-def testar_extensao_destino() -> None:
+def testar_extensao_destino(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de destino sem .docx."""
+
+    arquivo_origem = tmp_path / "teste_extensoes_agenda.docx"
+    criar_documento_teste(arquivo_origem)
 
     updater = AgendaUpdater()
 
-    destino = Path("modelos") / "destino_invalido.txt"
+    destino = tmp_path / "destino_invalido.txt"
 
     try:
         updater.atualizar_ano(
-            ARQUIVO_TESTE,
+            arquivo_origem,
             2026,
             2027,
             destino,
@@ -78,19 +89,24 @@ def testar_extensao_destino() -> None:
         )
 
 
-def testar_origem_diretorio() -> None:
+def testar_origem_diretorio(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de diretório como arquivo de origem."""
 
     updater = AgendaUpdater()
 
-    diretorio = Path("modelos")
+    diretorio = tmp_path / "modelos"
+    diretorio.mkdir()
+
+    destino = tmp_path / "destino.docx"
 
     try:
         updater.atualizar_ano(
             diretorio,
             2026,
             2027,
-            DESTINO_TESTE,
+            destino,
         )
     except ValueError:
         print("✓ Diretório rejeitado como arquivo de origem.")
@@ -105,15 +121,10 @@ def main() -> None:
 
     print("\n=== TESTE DAS EXTENSÕES DO AGENDAUPDATER ===\n")
 
-    ARQUIVO_TESTE.parent.mkdir(parents=True, exist_ok=True)
-
-    criar_documento_teste()
-
-    testar_extensao_origem()
-    testar_extensao_destino()
-    testar_origem_diretorio()
-
-    print("\nTodos os testes de extensão foram concluídos com sucesso.")
+    print(
+        "Os testes são executados pelo pytest "
+        "utilizando diretórios temporários."
+    )
 
 
 if __name__ == "__main__":

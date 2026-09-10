@@ -12,12 +12,15 @@ from docx import Document
 from core.agenda_updater import AgendaUpdater
 
 
-ARQUIVO_TESTE = Path("modelos") / "teste_validacoes_agenda.docx"
-DESTINO_TESTE = Path("modelos") / "teste_validacoes_agenda_atualizada.docx"
-
-
-def criar_documento_teste() -> None:
+def criar_documento_teste(
+    arquivo: Path,
+) -> None:
     """Cria um documento Word utilizado pelos testes."""
+
+    arquivo.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     documento = Document()
 
@@ -25,22 +28,25 @@ def criar_documento_teste() -> None:
     documento.add_paragraph("Audiência em 05/01/2026.")
     documento.add_paragraph("Reunião em 10/02/2026.")
 
-    documento.save(str(ARQUIVO_TESTE))
+    documento.save(str(arquivo))
 
 
-def testar_arquivo_inexistente() -> None:
+def testar_arquivo_inexistente(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de arquivo inexistente."""
 
     updater = AgendaUpdater()
 
-    arquivo = Path("modelos") / "arquivo_que_nao_existe.docx"
+    arquivo = tmp_path / "arquivo_que_nao_existe.docx"
+    destino = tmp_path / "destino.docx"
 
     try:
         updater.atualizar_ano(
             arquivo,
             2026,
             2027,
-            DESTINO_TESTE,
+            destino,
         )
     except FileNotFoundError:
         print("✓ Arquivo inexistente rejeitado corretamente.")
@@ -50,17 +56,22 @@ def testar_arquivo_inexistente() -> None:
         )
 
 
-def testar_destino_igual_origem() -> None:
+def testar_destino_igual_origem(
+    tmp_path: Path,
+) -> None:
     """Verifica proteção contra sobrescrita do original."""
+
+    arquivo_origem = tmp_path / "teste_validacoes_agenda.docx"
+    criar_documento_teste(arquivo_origem)
 
     updater = AgendaUpdater()
 
     try:
         updater.atualizar_ano(
-            ARQUIVO_TESTE,
+            arquivo_origem,
             2026,
             2027,
-            ARQUIVO_TESTE,
+            arquivo_origem,
         )
     except ValueError:
         print("✓ Sobrescrita do arquivo original bloqueada.")
@@ -70,17 +81,24 @@ def testar_destino_igual_origem() -> None:
         )
 
 
-def testar_anos_iguais() -> None:
+def testar_anos_iguais(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de anos iguais."""
+
+    arquivo_origem = tmp_path / "teste_validacoes_agenda.docx"
+    criar_documento_teste(arquivo_origem)
+
+    destino = tmp_path / "destino.docx"
 
     updater = AgendaUpdater()
 
     try:
         updater.atualizar_ano(
-            ARQUIVO_TESTE,
+            arquivo_origem,
             2026,
             2026,
-            DESTINO_TESTE,
+            destino,
         )
     except ValueError:
         print("✓ Anos iguais rejeitados corretamente.")
@@ -90,17 +108,24 @@ def testar_anos_iguais() -> None:
         )
 
 
-def testar_ano_invalido() -> None:
+def testar_ano_invalido(
+    tmp_path: Path,
+) -> None:
     """Verifica rejeição de ano fora do intervalo válido."""
+
+    arquivo_origem = tmp_path / "teste_validacoes_agenda.docx"
+    criar_documento_teste(arquivo_origem)
+
+    destino = tmp_path / "destino.docx"
 
     updater = AgendaUpdater()
 
     try:
         updater.atualizar_ano(
-            ARQUIVO_TESTE,
+            arquivo_origem,
             0,
             2027,
-            DESTINO_TESTE,
+            destino,
         )
     except ValueError:
         print("✓ Ano inválido rejeitado corretamente.")
@@ -115,16 +140,10 @@ def main() -> None:
 
     print("\n=== TESTE DAS VALIDAÇÕES DO AGENDAUPDATER ===\n")
 
-    ARQUIVO_TESTE.parent.mkdir(parents=True, exist_ok=True)
-
-    criar_documento_teste()
-
-    testar_arquivo_inexistente()
-    testar_destino_igual_origem()
-    testar_anos_iguais()
-    testar_ano_invalido()
-
-    print("\nTodos os testes de validação foram concluídos com sucesso.")
+    print(
+        "Os testes são executados pelo pytest "
+        "utilizando diretórios temporários."
+    )
 
 
 if __name__ == "__main__":
