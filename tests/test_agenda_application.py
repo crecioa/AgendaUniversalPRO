@@ -2,18 +2,27 @@
 Agenda Universal PRO
 Arquivo: tests/test_agenda_application.py
 
-Teste de integração da camada AgendaApplication.
+Testes da camada AgendaApplication.
+
+Sprint 4.7:
+- Valida o fluxo completo de atualização de ano.
+- Valida propagação de erros.
+- Valida registro de exceções no logger.
 """
 
 from pathlib import Path
+from typing import Any, cast
+from unittest.mock import Mock
 
+import pytest
 from docx import Document
 
+from config.agenda_config import AgendaConfig
 from services.agenda_application import AgendaApplication
 
 
 def criar_documento_teste(arquivo: Path) -> None:
-    """Cria um documento Word para o teste."""
+    """Cria um documento Word para os testes."""
 
     documento = Document()
 
@@ -81,28 +90,30 @@ def validar_documento(arquivo: Path) -> None:
     assert tabela.cell(1, 1).text == "Sessão"
 
 
-def main() -> None:
-    """Executa o teste da AgendaApplication."""
+def criar_aplicacao_mock() -> AgendaApplication:
+    """Cria uma AgendaApplication com dependências simuladas."""
 
-    print(
-        "\n=== TESTE DA AGENDAAPPLICATION ===\n"
-    )
+    aplicacao = AgendaApplication()
 
-    pasta_modelos = Path("modelos")
+    aplicacao.logger = Mock()
+    aplicacao.agenda_updater = Mock()
 
-    pasta_modelos.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    return aplicacao
+
+
+def test_atualizar_ano_fluxo_completo(
+    tmp_path: Path,
+) -> None:
+    """Valida o fluxo completo de atualização de ano."""
 
     arquivo_origem = (
-        pasta_modelos
-        / "teste_agenda_application.docx"
+        tmp_path
+        / "agenda.docx"
     )
 
     arquivo_destino = (
-        pasta_modelos
-        / "teste_agenda_application_atualizada.docx"
+        tmp_path
+        / "agenda_2027.docx"
     )
 
     criar_documento_teste(
@@ -118,34 +129,150 @@ def main() -> None:
         destino=arquivo_destino,
     )
 
-    print(
-        f"Substituições realizadas: {quantidade}"
-    )
-
     assert quantidade == 3
-
     assert arquivo_destino.exists()
 
     validar_documento(
         arquivo_destino
     )
 
-    print(
-        "Parágrafos atualizados corretamente."
+
+def test_atualizar_ano_registra_e_repropaga_erro(
+    tmp_path: Path,
+) -> None:
+    """Valida tratamento de erro na atualização do ano."""
+
+    arquivo_origem = (
+        tmp_path
+        / "agenda.docx"
     )
 
-    print(
-        "Tabela atualizada corretamente."
+    arquivo_destino = (
+        tmp_path
+        / "agenda_2027.docx"
     )
 
-    print(
-        "Documento validado com sucesso."
+    aplicacao = criar_aplicacao_mock()
+
+    agenda_updater = cast(
+        Any,
+        aplicacao.agenda_updater,
     )
 
-    print(
-        "\nTeste concluído com sucesso."
+    logger = cast(
+        Any,
+        aplicacao.logger,
     )
 
+    erro = RuntimeError(
+        "Erro durante atualização do ano."
+    )
 
-if __name__ == "__main__":
-    main()
+    agenda_updater.atualizar_ano.side_effect = erro
+
+    with pytest.raises(
+        RuntimeError,
+        match="Erro durante atualização do ano.",
+    ):
+        aplicacao.atualizar_ano(
+            arquivo=arquivo_origem,
+            ano_origem=2026,
+            ano_destino=2027,
+            destino=arquivo_destino,
+        )
+
+    logger.exception.assert_called_once()
+
+
+def test_atualizar_datas_registra_e_repropaga_erro(
+    tmp_path: Path,
+) -> None:
+    """Valida tratamento de erro na atualização de datas."""
+
+    arquivo_origem = (
+        tmp_path
+        / "agenda.docx"
+    )
+
+    arquivo_destino = (
+        tmp_path
+        / "agenda_atualizada.docx"
+    )
+
+    aplicacao = criar_aplicacao_mock()
+
+    agenda_updater = cast(
+        Any,
+        aplicacao.agenda_updater,
+    )
+
+    logger = cast(
+        Any,
+        aplicacao.logger,
+    )
+
+    erro = RuntimeError(
+        "Erro durante atualização de datas."
+    )
+
+    agenda_updater.atualizar_agenda.side_effect = erro
+
+    with pytest.raises(
+        RuntimeError,
+        match="Erro durante atualização de datas.",
+    ):
+        aplicacao.atualizar_datas(
+            arquivo=arquivo_origem,
+            substituicoes={
+                "05/01/2026": "05/01/2027",
+            },
+            destino=arquivo_destino,
+        )
+
+    logger.exception.assert_called_once()
+
+
+def test_atualizar_configuracao_registra_e_repropaga_erro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida tratamento de erro usando configuração."""
+
+    aplicacao = criar_aplicacao_mock()
+
+    logger = cast(
+        Any,
+        aplicacao.logger,
+    )
+
+    erro = RuntimeError(
+        "Erro na atualização por configuração."
+    )
+
+    def atualizar_ano_mock(
+        *args: Any,
+        **kwargs: Any,
+    ) -> int:
+        """Simula uma falha durante atualização."""
+
+        raise erro
+
+    monkeypatch.setattr(
+        aplicacao,
+        "atualizar_ano",
+        atualizar_ano_mock,
+    )
+
+    config = AgendaConfig(
+        arquivo_origem=Path("agenda.docx"),
+        arquivo_destino=Path("agenda_2027.docx"),
+        ano_origem=2026,
+        ano_destino=2027,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Erro na atualização por configuração.",
+    ):
+        aplicacao.atualizar(config)
+
+    logger.exception.assert_called_once()
