@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -22,6 +24,8 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Agenda Universal PRO")
         self.setMinimumSize(900, 600)
+
+        self.arquivo_origem: Path | None = None
 
         self._criar_interface()
         self._criar_menus()
@@ -90,7 +94,7 @@ class MainWindow(QMainWindow):
         )
 
         descricao_cartao = QLabel(
-            "Atualize uma agenda para um novo ano."
+            "Selecione uma agenda Word para iniciar."
         )
         descricao_cartao.setStyleSheet(
             """
@@ -101,8 +105,21 @@ class MainWindow(QMainWindow):
             """
         )
 
+        self.arquivo_label = QLabel(
+            "Nenhum documento selecionado."
+        )
+        self.arquivo_label.setWordWrap(True)
+        self.arquivo_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 13px;
+                border: none;
+            }
+            """
+        )
+
         botao_nova = QPushButton(
-            "Iniciar nova atualização"
+            "Selecionar documento Word"
         )
         botao_nova.setMinimumHeight(45)
         botao_nova.clicked.connect(
@@ -112,6 +129,7 @@ class MainWindow(QMainWindow):
         layout_cartao.addWidget(titulo_cartao)
         layout_cartao.addWidget(descricao_cartao)
         layout_cartao.addSpacing(10)
+        layout_cartao.addWidget(self.arquivo_label)
         layout_cartao.addWidget(botao_nova)
 
         layout_principal.addWidget(titulo)
@@ -204,10 +222,30 @@ class MainWindow(QMainWindow):
         )
 
     def _nova_atualizacao(self) -> None:
-        """Prepara uma nova atualização."""
+        """Seleciona o documento Word de origem."""
+
+        arquivo, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar documento Word",
+            "",
+            "Documentos Word (*.docx)",
+        )
+
+        if not arquivo:
+            self.statusBar().showMessage(
+                "Seleção cancelada."
+            )
+            return
+
+        self.arquivo_origem = Path(arquivo)
+
+        self.arquivo_label.setText(
+            f"Documento selecionado:\n"
+            f"{self.arquivo_origem}"
+        )
 
         self.statusBar().showMessage(
-            "Nova atualização selecionada."
+            "Documento selecionado com sucesso."
         )
 
     def _mostrar_configuracoes(self) -> None:
