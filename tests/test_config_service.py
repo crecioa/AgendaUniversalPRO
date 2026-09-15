@@ -1,17 +1,19 @@
-﻿"""
-Agenda Universal PRO
+﻿"""Agenda Universal PRO
 Arquivo: tests/test_config_service.py
 
 Testes do serviço de configurações persistentes.
 
-Sprint 4.9:
-- Testa carregamento da configuração padrão.
-- Testa salvamento e carregamento.
-- Testa JSON inválido.
-- Testa JSON que não contém um objeto.
-- Testa campos inválidos.
-- Testa campos vazios.
-- Testa configuração incompleta.
+Sprint 4.19:
+
+Fortalece os testes do ConfigService.
+Testa o caminho padrão do arquivo de configuração.
+Testa carregamento da configuração padrão.
+Testa salvamento e carregamento.
+Testa JSON inválido.
+Testa JSON que não contém um objeto.
+Testa campos inválidos.
+Testa campos vazios.
+Testa configuração incompleta.
 """
 
 import json
@@ -21,6 +23,16 @@ import pytest
 
 from config.app_config import AppConfig
 from services.config_service import ConfigService
+
+
+def test_inicializa_com_arquivo_padrao() -> None:
+    """Testa o caminho padrão do arquivo de configuração."""
+
+    service = ConfigService()
+
+    assert service.arquivo_config == (
+        Path("data") / "app_config.json"
+    )
 
 
 def test_carregar_configuracao_padrao(tmp_path: Path) -> None:
@@ -36,12 +48,12 @@ def test_carregar_configuracao_padrao(tmp_path: Path) -> None:
     assert config.diretorio_destino == Path("output")
 
 
-def test_salvar_e_carregar_configuracao(tmp_path: Path) -> None:
+def test_salvar_e_carregar_configuracao(
+    tmp_path: Path,
+) -> None:
     """Testa o salvamento e carregamento da configuração."""
 
-    arquivo_config = (
-        tmp_path / "config" / "app_config.json"
-    )
+    arquivo_config = tmp_path / "config" / "app_config.json"
 
     service = ConfigService(arquivo_config)
 
@@ -56,12 +68,8 @@ def test_salvar_e_carregar_configuracao(tmp_path: Path) -> None:
 
     config_carregada = service.carregar()
 
-    assert config_carregada.diretorio_origem == Path(
-        "meus_modelos"
-    )
-    assert config_carregada.diretorio_destino == Path(
-        "meus_arquivos"
-    )
+    assert config_carregada.diretorio_origem == Path("meus_modelos")
+    assert config_carregada.diretorio_destino == Path("meus_arquivos")
 
 
 def test_carregar_json_invalido(tmp_path: Path) -> None:
@@ -82,7 +90,9 @@ def test_carregar_json_invalido(tmp_path: Path) -> None:
     assert config.diretorio_destino == Path("output")
 
 
-def test_carregar_json_nao_objeto(tmp_path: Path) -> None:
+def test_carregar_json_nao_objeto(
+    tmp_path: Path,
+) -> None:
     """Testa recuperação quando o JSON não é um objeto."""
 
     arquivo_config = tmp_path / "app_config.json"
@@ -98,7 +108,6 @@ def test_carregar_json_nao_objeto(tmp_path: Path) -> None:
 
     assert config.diretorio_origem == Path("modelos")
     assert config.diretorio_destino == Path("output")
-
 
 @pytest.mark.parametrize(
     "dados, origem_esperada, destino_esperado",
@@ -173,7 +182,7 @@ def test_carregar_campos_invalidos(
         ),
         (
             {
-                "diretorio_origem": "   ",
+                "diretorio_origem": " ",
                 "diretorio_destino": "output",
             },
             Path("modelos"),
@@ -190,7 +199,7 @@ def test_carregar_campos_invalidos(
         (
             {
                 "diretorio_origem": "modelos",
-                "diretorio_destino": "   ",
+                "diretorio_destino": " ",
             },
             Path("modelos"),
             Path("output"),
@@ -240,7 +249,5 @@ def test_carregar_configuracao_incompleta(
 
     config = service.carregar()
 
-    assert config.diretorio_origem == Path(
-        "meus_modelos"
-    )
+    assert config.diretorio_origem == Path("meus_modelos")
     assert config.diretorio_destino == Path("output")
