@@ -4,10 +4,10 @@ Arquivo: tests/test_agenda_application.py
 
 Testes da camada AgendaApplication.
 
-Sprint 4.7:
-- Valida o fluxo completo de atualização de ano.
-- Valida propagação de erros.
-- Valida registro de exceções no logger.
+Sprint 4.17:
+- Fortalece os testes dos fluxos de sucesso.
+- Mantém os testes de propagação de erros.
+- Valida atualização utilizando configuração.
 """
 
 from pathlib import Path
@@ -137,6 +137,54 @@ def test_atualizar_ano_fluxo_completo(
     )
 
 
+def test_atualizar_ano_sucesso(
+    tmp_path: Path,
+) -> None:
+    """Valida atualização de ano com dependência simulada."""
+
+    aplicacao = criar_aplicacao_mock()
+
+    agenda_updater = cast(
+        Any,
+        aplicacao.agenda_updater,
+    )
+
+    logger = cast(
+        Any,
+        aplicacao.logger,
+    )
+
+    agenda_updater.atualizar_ano.return_value = 5
+
+    arquivo_origem = (
+        tmp_path
+        / "agenda.docx"
+    )
+
+    arquivo_destino = (
+        tmp_path
+        / "agenda_2027.docx"
+    )
+
+    quantidade = aplicacao.atualizar_ano(
+        arquivo=arquivo_origem,
+        ano_origem=2026,
+        ano_destino=2027,
+        destino=arquivo_destino,
+    )
+
+    assert quantidade == 5
+
+    agenda_updater.atualizar_ano.assert_called_once_with(
+        arquivo=arquivo_origem,
+        ano_origem=2026,
+        ano_destino=2027,
+        destino=arquivo_destino,
+    )
+
+    assert logger.info.call_count == 2
+
+
 def test_atualizar_ano_registra_e_repropaga_erro(
     tmp_path: Path,
 ) -> None:
@@ -182,6 +230,57 @@ def test_atualizar_ano_registra_e_repropaga_erro(
         )
 
     logger.exception.assert_called_once()
+
+
+def test_atualizar_datas_sucesso(
+    tmp_path: Path,
+) -> None:
+    """Valida atualização de datas com dependência simulada."""
+
+    aplicacao = criar_aplicacao_mock()
+
+    agenda_updater = cast(
+        Any,
+        aplicacao.agenda_updater,
+    )
+
+    logger = cast(
+        Any,
+        aplicacao.logger,
+    )
+
+    agenda_updater.atualizar_agenda.return_value = 4
+
+    arquivo_origem = (
+        tmp_path
+        / "agenda.docx"
+    )
+
+    arquivo_destino = (
+        tmp_path
+        / "agenda_atualizada.docx"
+    )
+
+    substituicoes = {
+        "05/01/2026": "05/01/2027",
+        "10/02/2026": "10/02/2027",
+    }
+
+    quantidade = aplicacao.atualizar_datas(
+        arquivo=arquivo_origem,
+        substituicoes=substituicoes,
+        destino=arquivo_destino,
+    )
+
+    assert quantidade == 4
+
+    agenda_updater.atualizar_agenda.assert_called_once_with(
+        arquivo=arquivo_origem,
+        substituicoes=substituicoes,
+        destino=arquivo_destino,
+    )
+
+    assert logger.info.call_count == 2
 
 
 def test_atualizar_datas_registra_e_repropaga_erro(
@@ -230,6 +329,42 @@ def test_atualizar_datas_registra_e_repropaga_erro(
         )
 
     logger.exception.assert_called_once()
+
+
+def test_atualizar_configuracao_sucesso(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida atualização utilizando uma configuração."""
+
+    aplicacao = criar_aplicacao_mock()
+
+    atualizar_ano = Mock(
+        return_value=7
+    )
+
+    monkeypatch.setattr(
+        aplicacao,
+        "atualizar_ano",
+        atualizar_ano,
+    )
+
+    config = AgendaConfig(
+        arquivo_origem=Path("agenda.docx"),
+        arquivo_destino=Path("agenda_2027.docx"),
+        ano_origem=2026,
+        ano_destino=2027,
+    )
+
+    quantidade = aplicacao.atualizar(config)
+
+    assert quantidade == 7
+
+    atualizar_ano.assert_called_once_with(
+        arquivo=config.arquivo_origem,
+        ano_origem=config.ano_origem,
+        ano_destino=config.ano_destino,
+        destino=config.arquivo_destino,
+    )
 
 
 def test_atualizar_configuracao_registra_e_repropaga_erro(
