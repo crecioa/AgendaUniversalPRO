@@ -5,15 +5,221 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
+    QFormLayout,
     QFrame,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
+
+
+class ConfiguracaoDialog(QDialog):
+    """Janela para configurar uma atualização de agenda."""
+
+    def __init__(
+        self,
+        arquivo_origem: Path,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+
+        self.arquivo_origem = arquivo_origem
+        self.arquivo_destino: Path | None = None
+        self.ano_origem: int | None = None
+        self.ano_destino: int | None = None
+
+        self.setWindowTitle("Configurar atualização")
+        self.setMinimumWidth(550)
+
+        self._criar_interface()
+
+    def _criar_interface(self) -> None:
+        """Cria os componentes da janela."""
+
+        layout_principal = QVBoxLayout(self)
+        layout_principal.setContentsMargins(30, 25, 30, 25)
+        layout_principal.setSpacing(18)
+
+        titulo = QLabel("Configurar atualização")
+        titulo.setStyleSheet(
+            """
+            QLabel {
+                font-size: 22px;
+                font-weight: bold;
+            }
+            """
+        )
+
+        documento = QLabel(
+            f"Documento de origem:\n{self.arquivo_origem}"
+        )
+        documento.setWordWrap(True)
+        documento.setStyleSheet(
+            """
+            QLabel {
+                font-size: 13px;
+            }
+            """
+        )
+
+        formulario = QFormLayout()
+        formulario.setSpacing(12)
+
+        self.ano_origem_edit = QLineEdit()
+        self.ano_origem_edit.setPlaceholderText(
+            "Ex.: 2026"
+        )
+
+        self.ano_destino_edit = QLineEdit()
+        self.ano_destino_edit.setPlaceholderText(
+            "Ex.: 2027"
+        )
+
+        formulario.addRow(
+            "Ano de origem:",
+            self.ano_origem_edit,
+        )
+        formulario.addRow(
+            "Ano de destino:",
+            self.ano_destino_edit,
+        )
+
+        destino_layout = QHBoxLayout()
+
+        self.arquivo_destino_edit = QLineEdit()
+        self.arquivo_destino_edit.setPlaceholderText(
+            "Selecione o arquivo de destino"
+        )
+
+        botao_destino = QPushButton(
+            "Selecionar..."
+        )
+        botao_destino.clicked.connect(
+            self._selecionar_destino
+        )
+
+        destino_layout.addWidget(
+            self.arquivo_destino_edit
+        )
+        destino_layout.addWidget(botao_destino)
+
+        formulario.addRow(
+            "Arquivo de destino:",
+            destino_layout,
+        )
+
+        botoes = QHBoxLayout()
+
+        botao_cancelar = QPushButton("Cancelar")
+        botao_cancelar.clicked.connect(
+            self.reject
+        )
+
+        botao_continuar = QPushButton("Continuar")
+        botao_continuar.clicked.connect(
+            self._confirmar
+        )
+
+        botoes.addStretch()
+        botoes.addWidget(botao_cancelar)
+        botoes.addWidget(botao_continuar)
+
+        layout_principal.addWidget(titulo)
+        layout_principal.addWidget(documento)
+        layout_principal.addSpacing(5)
+        layout_principal.addLayout(formulario)
+        layout_principal.addSpacing(10)
+        layout_principal.addLayout(botoes)
+
+    def _selecionar_destino(self) -> None:
+        """Seleciona o arquivo de destino."""
+
+        arquivo, _ = QFileDialog.getSaveFileName(
+            self,
+            "Selecionar arquivo de destino",
+            "",
+            "Documentos Word (*.docx)",
+        )
+
+        if not arquivo:
+            return
+
+        caminho = Path(arquivo)
+
+        if caminho.suffix.lower() != ".docx":
+            caminho = caminho.with_suffix(".docx")
+
+        self.arquivo_destino_edit.setText(
+            str(caminho)
+        )
+
+    def _confirmar(self) -> None:
+        """Valida e confirma a configuração."""
+
+        ano_origem_texto = (
+            self.ano_origem_edit.text().strip()
+        )
+        ano_destino_texto = (
+            self.ano_destino_edit.text().strip()
+        )
+        destino_texto = (
+            self.arquivo_destino_edit.text().strip()
+        )
+
+        try:
+            ano_origem = int(ano_origem_texto)
+            ano_destino = int(ano_destino_texto)
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "Dados inválidos",
+                "Informe anos válidos.",
+            )
+            return
+
+        if ano_origem < 1900 or ano_origem > 2100:
+            QMessageBox.warning(
+                self,
+                "Ano inválido",
+                "O ano de origem deve estar entre "
+                "1900 e 2100.",
+            )
+            return
+
+        if ano_destino < 1900 or ano_destino > 2100:
+            QMessageBox.warning(
+                self,
+                "Ano inválido",
+                "O ano de destino deve estar entre "
+                "1900 e 2100.",
+            )
+            return
+
+        if not destino_texto:
+            QMessageBox.warning(
+                self,
+                "Arquivo não informado",
+                "Selecione o arquivo de destino.",
+            )
+            return
+
+        destino = Path(destino_texto)
+
+        if destino.suffix.lower() != ".docx":
+            destino = destino.with_suffix(".docx")
+
+        self.ano_origem = ano_origem
+        self.ano_destino = ano_destino
+        self.arquivo_destino = destino
+
+        self.accept()
 
 
 class MainWindow(QMainWindow):
@@ -26,6 +232,9 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
 
         self.arquivo_origem: Path | None = None
+        self.arquivo_destino: Path | None = None
+        self.ano_origem: int | None = None
+        self.ano_destino: int | None = None
 
         self._criar_interface()
         self._criar_menus()
@@ -68,7 +277,9 @@ class MainWindow(QMainWindow):
         )
 
         cartao = QFrame()
-        cartao.setFrameShape(QFrame.Shape.StyledPanel)
+        cartao.setFrameShape(
+            QFrame.Shape.StyledPanel
+        )
         cartao.setStyleSheet(
             """
             QFrame {
@@ -129,7 +340,9 @@ class MainWindow(QMainWindow):
         layout_cartao.addWidget(titulo_cartao)
         layout_cartao.addWidget(descricao_cartao)
         layout_cartao.addSpacing(10)
-        layout_cartao.addWidget(self.arquivo_label)
+        layout_cartao.addWidget(
+            self.arquivo_label
+        )
         layout_cartao.addWidget(botao_nova)
 
         layout_principal.addWidget(titulo)
@@ -246,6 +459,35 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(
             "Documento selecionado com sucesso."
+        )
+
+        self._abrir_configuracao()
+
+    def _abrir_configuracao(self) -> None:
+        """Abre a janela de configuração."""
+
+        if self.arquivo_origem is None:
+            return
+
+        dialogo = ConfiguracaoDialog(
+            self.arquivo_origem,
+            self,
+        )
+
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
+            self.statusBar().showMessage(
+                "Configuração cancelada."
+            )
+            return
+
+        self.ano_origem = dialogo.ano_origem
+        self.ano_destino = dialogo.ano_destino
+        self.arquivo_destino = (
+            dialogo.arquivo_destino
+        )
+
+        self.statusBar().showMessage(
+            "Configuração concluída com sucesso."
         )
 
     def _mostrar_configuracoes(self) -> None:
