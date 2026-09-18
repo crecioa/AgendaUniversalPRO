@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from config.agenda_config import AgendaConfig
+from services.agenda_application import AgendaApplication
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -86,6 +89,7 @@ class ConfiguracaoDialog(QDialog):
             "Ano de origem:",
             self.ano_origem_edit,
         )
+
         formulario.addRow(
             "Ano de destino:",
             self.ano_destino_edit,
@@ -166,9 +170,11 @@ class ConfiguracaoDialog(QDialog):
         ano_origem_texto = (
             self.ano_origem_edit.text().strip()
         )
+
         ano_destino_texto = (
             self.ano_destino_edit.text().strip()
         )
+
         destino_texto = (
             self.arquivo_destino_edit.text().strip()
         )
@@ -176,6 +182,7 @@ class ConfiguracaoDialog(QDialog):
         try:
             ano_origem = int(ano_origem_texto)
             ano_destino = int(ano_destino_texto)
+
         except ValueError:
             QMessageBox.warning(
                 self,
@@ -246,7 +253,13 @@ class MainWindow(QMainWindow):
         central = QWidget()
         layout_principal = QVBoxLayout(central)
 
-        layout_principal.setContentsMargins(40, 30, 40, 30)
+        layout_principal.setContentsMargins(
+            40,
+            30,
+            40,
+            30,
+        )
+
         layout_principal.setSpacing(20)
 
         titulo = QLabel("Agenda Universal PRO")
@@ -258,6 +271,7 @@ class MainWindow(QMainWindow):
             }
             """
         )
+
         titulo.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -265,6 +279,7 @@ class MainWindow(QMainWindow):
         descricao = QLabel(
             "Atualização e gerenciamento de agendas."
         )
+
         descricao.setStyleSheet(
             """
             QLabel {
@@ -272,6 +287,7 @@ class MainWindow(QMainWindow):
             }
             """
         )
+
         descricao.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -280,6 +296,7 @@ class MainWindow(QMainWindow):
         cartao.setFrameShape(
             QFrame.Shape.StyledPanel
         )
+
         cartao.setStyleSheet(
             """
             QFrame {
@@ -293,7 +310,10 @@ class MainWindow(QMainWindow):
         layout_cartao = QVBoxLayout(cartao)
         layout_cartao.setSpacing(12)
 
-        titulo_cartao = QLabel("Nova atualização")
+        titulo_cartao = QLabel(
+            "Nova atualização"
+        )
+
         titulo_cartao.setStyleSheet(
             """
             QLabel {
@@ -307,6 +327,7 @@ class MainWindow(QMainWindow):
         descricao_cartao = QLabel(
             "Selecione uma agenda Word para iniciar."
         )
+
         descricao_cartao.setStyleSheet(
             """
             QLabel {
@@ -319,7 +340,9 @@ class MainWindow(QMainWindow):
         self.arquivo_label = QLabel(
             "Nenhum documento selecionado."
         )
+
         self.arquivo_label.setWordWrap(True)
+
         self.arquivo_label.setStyleSheet(
             """
             QLabel {
@@ -332,18 +355,30 @@ class MainWindow(QMainWindow):
         botao_nova = QPushButton(
             "Selecionar documento Word"
         )
+
         botao_nova.setMinimumHeight(45)
+
         botao_nova.clicked.connect(
             self._nova_atualizacao
         )
 
-        layout_cartao.addWidget(titulo_cartao)
-        layout_cartao.addWidget(descricao_cartao)
+        layout_cartao.addWidget(
+            titulo_cartao
+        )
+
+        layout_cartao.addWidget(
+            descricao_cartao
+        )
+
         layout_cartao.addSpacing(10)
+
         layout_cartao.addWidget(
             self.arquivo_label
         )
-        layout_cartao.addWidget(botao_nova)
+
+        layout_cartao.addWidget(
+            botao_nova
+        )
 
         layout_principal.addWidget(titulo)
         layout_principal.addWidget(descricao)
@@ -354,9 +389,11 @@ class MainWindow(QMainWindow):
         rodape = QLabel(
             "Agenda Universal PRO — versão 1.0.0"
         )
+
         rodape.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
+
         rodape.setStyleSheet(
             """
             QLabel {
@@ -392,6 +429,7 @@ class MainWindow(QMainWindow):
             "Nova atualização",
             self,
         )
+
         acao_nova.triggered.connect(
             self._nova_atualizacao
         )
@@ -400,6 +438,7 @@ class MainWindow(QMainWindow):
             "Sair",
             self,
         )
+
         acao_sair.triggered.connect(
             self.close
         )
@@ -408,6 +447,7 @@ class MainWindow(QMainWindow):
             "Configurações",
             self,
         )
+
         acao_configuracoes.triggered.connect(
             self._mostrar_configuracoes
         )
@@ -416,15 +456,18 @@ class MainWindow(QMainWindow):
             "Sobre",
             self,
         )
+
         acao_sobre.triggered.connect(
             self._mostrar_sobre
         )
 
         menu_arquivo.addAction(acao_sair)
         menu_agenda.addAction(acao_nova)
+
         menu_configuracoes.addAction(
             acao_configuracoes
         )
+
         menu_ajuda.addAction(acao_sobre)
 
     def _criar_barra_status(self) -> None:
@@ -474,7 +517,10 @@ class MainWindow(QMainWindow):
             self,
         )
 
-        if dialogo.exec() != QDialog.DialogCode.Accepted:
+        if (
+            dialogo.exec()
+            != QDialog.DialogCode.Accepted
+        ):
             self.statusBar().showMessage(
                 "Configuração cancelada."
             )
@@ -486,8 +532,72 @@ class MainWindow(QMainWindow):
             dialogo.arquivo_destino
         )
 
+        if (
+            self.arquivo_destino is None
+            or self.ano_origem is None
+            or self.ano_destino is None
+        ):
+            QMessageBox.critical(
+                self,
+                "Erro de configuração",
+                "A configuração da atualização "
+                "não foi preenchida corretamente.",
+            )
+
+            self.statusBar().showMessage(
+                "Erro na configuração."
+            )
+            return
+
+        config = AgendaConfig(
+            arquivo_origem=self.arquivo_origem,
+            arquivo_destino=self.arquivo_destino,
+            ano_origem=self.ano_origem,
+            ano_destino=self.ano_destino,
+        )
+
+        aplicacao = AgendaApplication()
+
         self.statusBar().showMessage(
-            "Configuração concluída com sucesso."
+            "Atualizando agenda..."
+        )
+
+        try:
+            quantidade = aplicacao.atualizar(
+                config
+            )
+
+        except Exception as erro:
+            QMessageBox.critical(
+                self,
+                "Erro na atualização",
+                (
+                    "Não foi possível atualizar "
+                    "a agenda.\n\n"
+                    f"{erro}"
+                ),
+            )
+
+            self.statusBar().showMessage(
+                "Erro durante a atualização."
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Atualização concluída",
+            (
+                "A agenda foi atualizada com sucesso."
+                "\n\n"
+                f"Datas atualizadas: {quantidade}"
+                "\n"
+                f"Arquivo gerado:\n"
+                f"{self.arquivo_destino}"
+            ),
+        )
+
+        self.statusBar().showMessage(
+            "Atualização concluída com sucesso."
         )
 
     def _mostrar_configuracoes(self) -> None:
