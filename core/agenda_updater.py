@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from docx.document import Document as DocxDocument
+
+from services.content_validator import ContentValidator
+
 from services.backup_service import BackupService
 from services.logger_service import LoggerService
 from services.text_updater import TextUpdater
@@ -23,6 +27,7 @@ class AgendaUpdater:
         self.word_service = WordService()
         self.backup_service = BackupService()
         self.text_updater = TextUpdater()
+        self.content_validator = ContentValidator()
 
     def abrir_agenda(
         self,
@@ -117,10 +122,23 @@ class AgendaUpdater:
                 caminho
             )
 
+            # Captura as ocorrências antes de alterar o documento.
+            referencia = (
+                self.content_validator.contar_substituicoes(documento, substituicoes)
+                if isinstance(documento, DocxDocument)
+                else None
+            )
+
             quantidade = self.text_updater.atualizar_datas(
                 documento,
                 substituicoes,
             )
+
+            if referencia is not None:
+                relatorio = self.content_validator.validar_substituicoes(
+                    documento, substituicoes, referencia, quantidade
+                )
+                self.logger.info("Validação de conteúdo: %s", relatorio)
 
             self.word_service.salvar_documento(
                 documento,
@@ -194,11 +212,23 @@ class AgendaUpdater:
                 caminho
             )
 
+            referencia_ano = (
+                self.content_validator.contar_ano(documento, ano_origem)
+                if isinstance(documento, DocxDocument)
+                else None
+            )
+
             quantidade = self.text_updater.atualizar_ano(
                 documento,
                 ano_origem,
                 ano_destino,
             )
+
+            if referencia_ano is not None:
+                relatorio = self.content_validator.validar_ano(
+                    documento, ano_origem, referencia_ano, quantidade
+                )
+                self.logger.info("Validação de conteúdo: %s", relatorio)
 
             self.word_service.salvar_documento(
                 documento,
