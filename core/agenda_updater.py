@@ -12,6 +12,7 @@ from pathlib import Path
 from docx.document import Document as DocxDocument
 
 from services.content_validator import ContentValidator
+from services.update_report import UpdateReport, UpdateReportService
 
 from services.backup_service import BackupService
 from services.logger_service import LoggerService
@@ -28,6 +29,7 @@ class AgendaUpdater:
         self.backup_service = BackupService()
         self.text_updater = TextUpdater()
         self.content_validator = ContentValidator()
+        self.ultimo_relatorio: UpdateReport | None = None
 
     def abrir_agenda(
         self,
@@ -103,6 +105,7 @@ class AgendaUpdater:
         """
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
+        self.ultimo_relatorio = None
 
         try:
             self._validar_arquivo_origem(caminho)
@@ -129,6 +132,11 @@ class AgendaUpdater:
                 else None
             )
 
+            antes = (
+                UpdateReportService.capturar(documento)
+                if isinstance(documento, DocxDocument) else None
+            )
+
             quantidade = self.text_updater.atualizar_datas(
                 documento,
                 substituicoes,
@@ -144,6 +152,17 @@ class AgendaUpdater:
                 documento,
                 caminho_destino,
             )
+
+            if antes is not None:
+                self.ultimo_relatorio = UpdateReportService.criar(
+                    origem=caminho,
+                    destino=caminho_destino,
+                    modo="substituicoes",
+                    antes=antes,
+                    depois=UpdateReportService.capturar(documento),
+                    previstas=referencia,
+                    atualizadas=quantidade,
+                )
 
             self.logger.info(
                 "Agenda atualizada com sucesso. "
@@ -189,6 +208,7 @@ class AgendaUpdater:
         """
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
+        self.ultimo_relatorio = None
 
         try:
             self._validar_arquivo_origem(caminho)
@@ -218,6 +238,11 @@ class AgendaUpdater:
                 else None
             )
 
+            antes = (
+                UpdateReportService.capturar(documento)
+                if isinstance(documento, DocxDocument) else None
+            )
+
             quantidade = self.text_updater.atualizar_ano(
                 documento,
                 ano_origem,
@@ -234,6 +259,17 @@ class AgendaUpdater:
                 documento,
                 caminho_destino,
             )
+
+            if antes is not None:
+                self.ultimo_relatorio = UpdateReportService.criar(
+                    origem=caminho,
+                    destino=caminho_destino,
+                    modo="ano",
+                    antes=antes,
+                    depois=UpdateReportService.capturar(documento),
+                    previstas=referencia_ano,
+                    atualizadas=quantidade,
+                )
 
             self.logger.info(
                 "Agenda atualizada de %d para %d. "
@@ -331,3 +367,9 @@ class AgendaUpdater:
                 "O ano de origem e o ano de destino "
                 "não podem ser iguais."
             )
+
+    def exportar_ultimo_relatorio(self, destino: str | Path) -> Path:
+        """Exporta o último relatório em JSON, sem sobrescrever arquivos."""
+        if self.ultimo_relatorio is None:
+            raise ValueError("Não existe relatório de atualização disponível.")
+        return UpdateReportService.exportar(self.ultimo_relatorio, destino)
