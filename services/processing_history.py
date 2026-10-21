@@ -207,3 +207,52 @@ class ProcessingHistoryService:
             "datas_atualizadas": datas_atualizadas,
             "por_operacao": por_operacao,
         }
+
+    def exportar_resumo_json(
+        self,
+        destino: str | Path,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> Path:
+        """Exporta as estatísticas para JSON sem sobrescrever arquivos existentes."""
+        caminho = Path(destino)
+        if caminho.suffix.lower() != ".json":
+            raise ValueError("A exportação do resumo deve possuir extensão .json.")
+        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        with caminho.open("x", encoding="utf-8") as arquivo:
+            json.dump(resumo, arquivo, ensure_ascii=False, indent=2)
+            arquivo.write("\n")
+        return caminho
+
+    def exportar_resumo_csv(
+        self,
+        destino: str | Path,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> Path:
+        """Exporta as estatísticas em linhas indicador/valor, incluindo operações."""
+        caminho = Path(destino)
+        if caminho.suffix.lower() != ".csv":
+            raise ValueError("A exportação do resumo deve possuir extensão .csv.")
+        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        indicadores = (
+            "total_operacoes", "sucessos", "falhas", "taxa_sucesso_percentual",
+            "atualizacoes_documentos", "datas_atualizadas",
+        )
+        distribuicao = resumo["por_operacao"]
+        if not isinstance(distribuicao, dict):
+            raise ValueError("Distribuição de operações inválida no resumo.")
+        with caminho.open("x", encoding="utf-8-sig", newline="") as arquivo:
+            escritor = csv.writer(arquivo)
+            escritor.writerow(("indicador", "valor"))
+            for indicador in indicadores:
+                escritor.writerow((indicador, resumo[indicador]))
+            for tipo, quantidade in sorted(distribuicao.items()):
+                escritor.writerow((f"por_operacao:{tipo}", quantidade))
+        return caminho
