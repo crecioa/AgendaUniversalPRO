@@ -81,6 +81,8 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> list[dict[str, object]]:
         """Consulta em ordem original, com limites inclusivos em UTC."""
         de = self._normalizar_limite(inicio, fim=False)
@@ -91,6 +93,9 @@ class ProcessingHistoryService:
             raise ValueError("Status de filtro inválido.")
         if operacao is not None and not operacao:
             raise ValueError("A operação não pode ser vazia.")
+        for nome, valor in (("origem", origem), ("arquivo_destino", arquivo_destino)):
+            if valor is not None and (not isinstance(valor, (str, Path)) or not str(valor).strip()):
+                raise ValueError(f"Filtro {nome} inválido: informe um caminho não vazio.")
         if not self.caminho.exists():
             return []
         resultado: list[dict[str, object]] = []
@@ -105,6 +110,10 @@ class ProcessingHistoryService:
                     if status is not None and registro.get("status") != status:
                         continue
                     if operacao is not None and registro.get("operacao") != operacao:
+                        continue
+                    if origem is not None and registro.get("origem") != str(origem):
+                        continue
+                    if arquivo_destino is not None and registro.get("destino") != str(arquivo_destino):
                         continue
                     if de is not None or ate is not None:
                         instante = registro.get("data_hora_utc")
@@ -133,12 +142,14 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> Path:
         """Exporta os registros filtrados sem alterar o JSONL ou sobrescrever CSV."""
         caminho = Path(destino)
         if caminho.suffix.lower() != ".csv":
             raise ValueError("A exportação deve possuir extensão .csv.")
-        registros = self.consultar(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        registros = self.consultar(inicio=inicio, fim=fim, status=status, operacao=operacao, origem=origem, arquivo_destino=arquivo_destino)
         colunas = (
             "data_hora_utc", "operacao", "origem", "destino", "status",
             "previstas", "atualizadas", "erro", "relatorio",
@@ -159,6 +170,8 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> dict[str, object]:
         """Resume os eventos filtrados sem modificar o histórico original.
 
@@ -167,7 +180,8 @@ class ProcessingHistoryService:
         documentos bem-sucedidas, não exportações de relatórios.
         """
         registros = self.consultar(
-            inicio=inicio, fim=fim, status=status, operacao=operacao
+            inicio=inicio, fim=fim, status=status, operacao=operacao,
+            origem=origem, arquivo_destino=arquivo_destino
         )
         return self._resumir_registros(registros)
 
@@ -221,12 +235,14 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> Path:
         """Exporta as estatísticas para JSON sem sobrescrever arquivos existentes."""
         caminho = Path(destino)
         if caminho.suffix.lower() != ".json":
             raise ValueError("A exportação do resumo deve possuir extensão .json.")
-        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao, origem=origem, arquivo_destino=arquivo_destino)
         with caminho.open("x", encoding="utf-8") as arquivo:
             json.dump(resumo, arquivo, ensure_ascii=False, indent=2)
             arquivo.write("\n")
@@ -240,12 +256,14 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> Path:
         """Exporta as estatísticas em linhas indicador/valor, incluindo operações."""
         caminho = Path(destino)
         if caminho.suffix.lower() != ".csv":
             raise ValueError("A exportação do resumo deve possuir extensão .csv.")
-        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        resumo = self.resumir(inicio=inicio, fim=fim, status=status, operacao=operacao, origem=origem, arquivo_destino=arquivo_destino)
         indicadores = (
             "total_operacoes", "sucessos", "falhas", "taxa_sucesso_percentual",
             "atualizacoes_documentos", "datas_atualizadas",
@@ -270,6 +288,8 @@ class ProcessingHistoryService:
         fim: date | datetime | None = None,
         status: str | None = None,
         operacao: str | None = None,
+        origem: str | Path | None = None,
+        arquivo_destino: str | Path | None = None,
     ) -> Path:
         """Exporta histórico, indicadores e auditoria em JSON, sem sobrescrever.
 
@@ -281,7 +301,8 @@ class ProcessingHistoryService:
             raise ValueError("O relatório consolidado deve possuir extensão .json.")
 
         registros = self.consultar(
-            inicio=inicio, fim=fim, status=status, operacao=operacao
+            inicio=inicio, fim=fim, status=status, operacao=operacao,
+            origem=origem, arquivo_destino=arquivo_destino
         )
         # Reaproveita a lógica estatística sem consultar o arquivo uma segunda vez.
         resumo = self._resumir_registros(registros)
@@ -290,6 +311,8 @@ class ProcessingHistoryService:
             "fim": fim.isoformat() if fim is not None else None,
             "status": status,
             "operacao": operacao,
+            "origem": str(origem) if origem is not None else None,
+            "arquivo_destino": str(arquivo_destino) if arquivo_destino is not None else None,
         }
         relatorio: dict[str, object] = {
             "versao_relatorio": 1,
