@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from config.settings import LOGS_DIR
@@ -59,9 +60,93 @@ class ProcessingHistoryService:
             os.close(descritor)
         return registro
 
-    def consultar(self) -> list[dict[str, object]]:
-        """Lê os registros existentes em ordem de gravação."""
+    @staticmethod
+    def _normalizar_limite(valor: date | datetime | None, *, fim: bool) -> datetime | None:
+        """Converte datas e instantes para UTC; datas incluem o dia inteiro."""
+        if valor is None:
+            return None
+        if isinstance(valor, datetime):
+            if valor.tzinfo is None or valor.utcoffset() is None:
+                raise ValueError("O horário do filtro deve possuir fuso horário.")
+            return valor.astimezone(timezone.utc)
+        if isinstance(valor, date):
+            horario = time.max if fim else time.min
+            return datetime.combine(valor, horario, tzinfo=timezone.utc)
+        raise TypeError("O filtro de período deve ser date ou datetime.")
+
+    def consultar(
+        self,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> list[dict[str, object]]:
+        """Consulta em ordem original, com limites inclusivos em UTC."""
+        de = self._normalizar_limite(inicio, fim=False)
+        ate = self._normalizar_limite(fim, fim=True)
+        if de is not None and ate is not None and de > ate:
+            raise ValueError("O início do período não pode ser posterior ao fim.")
+        if status is not None and status not in {"sucesso", "falha"}:
+            raise ValueError("Status de filtro inválido.")
+        if operacao is not None and not operacao:
+            raise ValueError("A operação não pode ser vazia.")
         if not self.caminho.exists():
             return []
+        resultado: list[dict[str, object]] = []
         with self.caminho.open("r", encoding="utf-8") as arquivo:
-            return [json.loads(linha) for linha in arquivo if linha.strip()]
+            for numero, linha in enumerate(arquivo, start=1):
+                if not linha.strip():
+                    continue
+                try:
+                    registro = json.loads(linha)
+                    if not isinstance(registro, dict):
+                        raise ValueError("Registro não é um objeto JSON.")
+                    if status is not None and registro.get("status") != status:
+                        continue
+                    if operacao is not None and registro.get("operacao") != operacao:
+                        continue
+                    if de is not None or ate is not None:
+                        instante = registro.get("data_hora_utc")
+                        if not isinstance(instante, str):
+                            raise ValueError("Data/hora ausente ou inválida.")
+                        quando = datetime.fromisoformat(instante.replace("Z", "+00:00"))
+                        if quando.tzinfo is None or quando.utcoffset() is None:
+                            raise ValueError("Data/hora sem fuso horário.")
+                        quando = quando.astimezone(timezone.utc)
+                        if de is not None and quando < de:
+                            continue
+                        if ate is not None and quando > ate:
+                            continue
+                except (ValueError, TypeError, json.JSONDecodeError) as erro:
+                    raise ValueError(
+                        f"Registro inválido no histórico, linha {numero}."
+                    ) from erro
+                resultado.append(registro)
+        return resultado
+
+    def exportar_csv(
+        self,
+        destino: str | Path,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> Path:
+        """Exporta os registros filtrados sem alterar o JSONL ou sobrescrever CSV."""
+        caminho = Path(destino)
+        if caminho.suffix.lower() != ".csv":
+            raise ValueError("A exportação deve possuir extensão .csv.")
+        registros = self.consultar(inicio=inicio, fim=fim, status=status, operacao=operacao)
+        colunas = (
+            "data_hora_utc", "operacao", "origem", "destino", "status",
+            "previstas", "atualizadas", "erro", "relatorio",
+        )
+        # 'x' garante criação exclusiva. newline evita linhas em branco no Windows.
+        with caminho.open("x", encoding="utf-8-sig", newline="") as arquivo:
+            escritor = csv.DictWriter(arquivo, fieldnames=colunas, extrasaction="ignore")
+            escritor.writeheader()
+            for registro in registros:
+                escritor.writerow(registro)
+        return caminho
