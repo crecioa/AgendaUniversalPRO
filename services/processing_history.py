@@ -169,6 +169,11 @@ class ProcessingHistoryService:
         registros = self.consultar(
             inicio=inicio, fim=fim, status=status, operacao=operacao
         )
+        return self._resumir_registros(registros)
+
+    @staticmethod
+    def _resumir_registros(registros: list[dict[str, object]]) -> dict[str, object]:
+        """Calcula os indicadores de uma única coleção de eventos."""
         por_operacao: dict[str, int] = {}
         sucessos = 0
         falhas = 0
@@ -255,4 +260,50 @@ class ProcessingHistoryService:
                 escritor.writerow((indicador, resumo[indicador]))
             for tipo, quantidade in sorted(distribuicao.items()):
                 escritor.writerow((f"por_operacao:{tipo}", quantidade))
+        return caminho
+
+    def exportar_relatorio_consolidado(
+        self,
+        destino: str | Path,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> Path:
+        """Exporta histórico, indicadores e auditoria em JSON, sem sobrescrever.
+
+        Os dados e as estatísticas são derivados da mesma consulta, para que
+        o relatório represente um conjunto coerente de eventos filtrados.
+        """
+        caminho = Path(destino)
+        if caminho.suffix.lower() != ".json":
+            raise ValueError("O relatório consolidado deve possuir extensão .json.")
+
+        registros = self.consultar(
+            inicio=inicio, fim=fim, status=status, operacao=operacao
+        )
+        # Reaproveita a lógica estatística sem consultar o arquivo uma segunda vez.
+        resumo = self._resumir_registros(registros)
+        filtros: dict[str, str | None] = {
+            "inicio": inicio.isoformat() if inicio is not None else None,
+            "fim": fim.isoformat() if fim is not None else None,
+            "status": status,
+            "operacao": operacao,
+        }
+        relatorio: dict[str, object] = {
+            "versao_relatorio": 1,
+            "gerado_em_utc": datetime.now(timezone.utc).isoformat(),
+            "auditoria": {
+                "arquivo_historico": str(self.caminho),
+                "quantidade_registros": len(registros),
+                "filtros": filtros,
+            },
+            "resumo": resumo,
+            "registros": registros,
+        }
+        # 'x' garante criação exclusiva mesmo em chamadas simultâneas.
+        with caminho.open("x", encoding="utf-8") as arquivo:
+            json.dump(relatorio, arquivo, ensure_ascii=False, indent=2)
+            arquivo.write("\n")
         return caminho
