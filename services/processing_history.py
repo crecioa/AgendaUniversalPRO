@@ -150,3 +150,60 @@ class ProcessingHistoryService:
             for registro in registros:
                 escritor.writerow(registro)
         return caminho
+
+
+    def resumir(
+        self,
+        *,
+        inicio: date | datetime | None = None,
+        fim: date | datetime | None = None,
+        status: str | None = None,
+        operacao: str | None = None,
+    ) -> dict[str, object]:
+        """Resume os eventos filtrados sem modificar o histórico original.
+
+        A taxa de sucesso considera todos os eventos consultados.
+        O total de datas atualizadas considera apenas atualizações de
+        documentos bem-sucedidas, não exportações de relatórios.
+        """
+        registros = self.consultar(
+            inicio=inicio, fim=fim, status=status, operacao=operacao
+        )
+        por_operacao: dict[str, int] = {}
+        sucessos = 0
+        falhas = 0
+        datas_atualizadas = 0
+        atualizacoes_documentos = 0
+
+        for registro in registros:
+            tipo = registro.get("operacao")
+            if not isinstance(tipo, str):
+                raise ValueError("Operação inválida no registro do histórico.")
+            por_operacao[tipo] = por_operacao.get(tipo, 0) + 1
+
+            situacao = registro.get("status")
+            if situacao == "sucesso":
+                sucessos += 1
+            elif situacao == "falha":
+                falhas += 1
+            else:
+                raise ValueError("Status inválido no registro do histórico.")
+
+            if situacao == "sucesso" and tipo in {"ano", "substituicoes"}:
+                atualizacoes_documentos += 1
+                quantidade = registro.get("atualizadas")
+                if quantidade is not None:
+                    if type(quantidade) is not int or quantidade < 0:
+                        raise ValueError("Quantidade atualizada inválida no histórico.")
+                    datas_atualizadas += quantidade
+
+        total = len(registros)
+        return {
+            "total_operacoes": total,
+            "sucessos": sucessos,
+            "falhas": falhas,
+            "taxa_sucesso_percentual": round(sucessos * 100 / total, 2) if total else 0.0,
+            "atualizacoes_documentos": atualizacoes_documentos,
+            "datas_atualizadas": datas_atualizadas,
+            "por_operacao": por_operacao,
+        }
