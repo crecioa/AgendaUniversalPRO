@@ -14,6 +14,9 @@ Sprint 4.11:
 """
 
 from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
 from typing import Any
 
 from docx import Document
@@ -237,3 +240,52 @@ def test_salvar_documento_registra_log(
         "Documento salvo: salvo.log.docx" in mensagem
         for mensagem in mensagens
     )
+
+
+def test_salvar_documento_recusa_destino_existente(tmp_path: Path) -> None:
+    """Não substitui documento já existente."""
+    destino = tmp_path / "existente.docx"
+    destino.write_bytes(b"conteudo original")
+
+    service = WordService()
+    documento = Document()
+
+    with pytest.raises(FileExistsError):
+        service.salvar_documento(documento, destino)
+
+    assert destino.read_bytes() == b"conteudo original"
+    assert list(tmp_path.iterdir()) == [destino]
+
+
+def test_salvar_documento_limpa_temporario_em_falha(tmp_path: Path) -> None:
+    """Falha na escrita não publica documento parcial."""
+    destino = tmp_path / "resultado.docx"
+    documento = Mock()
+    documento.save.side_effect = OSError("falha simulada")
+
+    with pytest.raises(OSError, match="falha simulada"):
+        WordService().salvar_documento(documento, destino)
+
+    assert not destino.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_salvar_documento_protege_destino_criado_durante_gravacao(
+    tmp_path: Path,
+) -> None:
+    """Não substitui arquivo criado por outro processo durante a escrita."""
+    destino = tmp_path / "concorrente.docx"
+
+    class DocumentoConcorrente:
+        def save(self, caminho: str) -> None:
+            Path(caminho).write_bytes(b"arquivo temporario")
+            destino.write_bytes(b"arquivo de outro processo")
+
+    with pytest.raises(FileExistsError):
+        WordService().salvar_documento(
+            DocumentoConcorrente(),  # type: ignore[arg-type]
+            destino,
+        )
+
+    assert destino.read_bytes() == b"arquivo de outro processo"
+    assert list(tmp_path.iterdir()) == [destino]
