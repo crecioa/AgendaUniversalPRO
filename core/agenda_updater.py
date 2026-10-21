@@ -37,7 +37,6 @@ class AgendaUpdater:
         Returns:
             Documento Word aberto.
         """
-
         caminho = Path(arquivo)
 
         self.logger.info(
@@ -93,12 +92,10 @@ class AgendaUpdater:
             Quantidade de substituições realizadas.
 
         Raises:
-            FileNotFoundError:
-                Se o arquivo original não existir.
-            ValueError:
-                Se o destino for igual ao arquivo original.
+            FileNotFoundError: Se o arquivo original não existir.
+            ValueError: Se o destino for inválido ou igual à origem.
+            FileExistsError: Se o arquivo de destino já existir.
         """
-
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
 
@@ -156,7 +153,7 @@ class AgendaUpdater:
     ) -> int:
         """
         Atualiza automaticamente o ano das datas de uma agenda
-        e salva o resultado.
+        e salva o resultado em um novo arquivo.
 
         Args:
             arquivo: Documento Word original.
@@ -168,13 +165,10 @@ class AgendaUpdater:
             Quantidade de datas atualizadas.
 
         Raises:
-            FileNotFoundError:
-                Se o arquivo original não existir.
-            ValueError:
-                Se os anos forem inválidos ou iguais, ou se o
-                destino for igual ao arquivo original.
+            FileNotFoundError: Se o arquivo original não existir.
+            ValueError: Se os anos ou o destino forem inválidos.
+            FileExistsError: Se o arquivo de destino já existir.
         """
-
         caminho = Path(arquivo)
         caminho_destino = Path(destino)
 
@@ -258,7 +252,7 @@ class AgendaUpdater:
         origem: Path,
         destino: Path,
     ) -> None:
-        """Impede que o arquivo original seja sobrescrito."""
+        """Impede sobrescrever a origem ou um destino existente."""
 
         if origem.resolve() == destino.resolve():
             raise ValueError(
@@ -268,6 +262,11 @@ class AgendaUpdater:
         if destino.suffix.lower() != ".docx":
             raise ValueError(
                 "O arquivo de destino deve possuir extensão .docx."
+            )
+
+        if destino.exists():
+            raise FileExistsError(
+                f"O arquivo de destino já existe: {destino}"
             )
 
     @staticmethod

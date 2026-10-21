@@ -489,3 +489,34 @@ def test_atualizar_ano_arquivo_inexistente(
         )
 
     updater.backup_service.criar_backup.assert_not_called()
+
+def test_atualizar_ano_impede_sobrescrever_destino_existente(
+    tmp_path: Path,
+) -> None:
+    """Impede sobrescrever um arquivo de destino existente."""
+    origem = tmp_path / "agenda.docx"
+    destino = tmp_path / "agenda_2027.docx"
+
+    origem.write_text("agenda original", encoding="utf-8")
+    destino.write_text(
+        "conteudo que deve ser preservado",
+        encoding="utf-8",
+    )
+
+    updater = criar_updater_mockado()
+
+    with pytest.raises(
+        FileExistsError,
+        match="destino j\u00e1 existe",
+    ):
+        updater.atualizar_ano(
+            origem,
+            2026,
+            2027,
+            destino,
+        )
+
+    assert destino.read_text(encoding="utf-8") == (
+        "conteudo que deve ser preservado"
+    )
+    updater.backup_service.criar_backup.assert_not_called()
