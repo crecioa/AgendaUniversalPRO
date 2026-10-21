@@ -1,3 +1,4 @@
+
 """Testes de integração do salvamento seguro de agendas (Sprint 5.10)."""
 
 from pathlib import Path
@@ -125,4 +126,28 @@ def test_integracao_destino_criado_durante_publicacao(
 
     assert origem.read_bytes() == original
     assert destino.read_bytes() == concorrente
+    assert not temporarios(destino)
+
+
+def test_integracao_nao_publica_documento_corrompido(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A atualização completa não publica um DOCX inválido."""
+    origem = tmp_path / "agenda.docx"
+    destino = tmp_path / "agenda_2027.docx"
+    criar_agenda(origem)
+    original = origem.read_bytes()
+
+    def gravar_corrompido(self: DocxDocument, arquivo: str) -> None:
+        Path(arquivo).write_bytes(b"arquivo Word corrompido")
+
+    monkeypatch.setattr(DocxDocument, "save", gravar_corrompido)
+
+    with pytest.raises(ValueError, match="inválido ou está corrompido"):
+        criar_updater_sem_backup().atualizar_ano(
+            origem, 2026, 2027, destino
+        )
+
+    assert origem.read_bytes() == original
+    assert not destino.exists()
     assert not temporarios(destino)

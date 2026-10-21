@@ -1,3 +1,4 @@
+
 """
 Agenda Universal PRO
 Arquivo: tests/test_word_service.py
@@ -278,7 +279,7 @@ def test_salvar_documento_protege_destino_criado_durante_gravacao(
 
     class DocumentoConcorrente:
         def save(self, caminho: str) -> None:
-            Path(caminho).write_bytes(b"arquivo temporario")
+            Document().save(caminho)
             destino.write_bytes(b"arquivo de outro processo")
 
     with pytest.raises(FileExistsError):
@@ -289,3 +290,41 @@ def test_salvar_documento_protege_destino_criado_durante_gravacao(
 
     assert destino.read_bytes() == b"arquivo de outro processo"
     assert list(tmp_path.iterdir()) == [destino]
+
+
+def test_salvar_documento_recusa_pacote_corrompido(tmp_path: Path) -> None:
+    """Não publica um arquivo ZIP inválido após o save."""
+    destino = tmp_path / "corrompido.docx"
+    documento = Mock()
+    documento.save.side_effect = lambda arquivo: Path(arquivo).write_bytes(
+        b"nao e um documento Word"
+    )
+
+    with pytest.raises(ValueError, match="inválido ou está corrompido"):
+        WordService().salvar_documento(documento, destino)
+
+    assert not destino.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_salvar_documento_recusa_zip_sem_documento_word(
+    tmp_path: Path,
+) -> None:
+    """Um ZIP válido sem estrutura DOCX também é recusado."""
+    from zipfile import ZipFile
+
+    destino = tmp_path / "zip_invalido.docx"
+
+    class DocumentoZipInvalido:
+        def save(self, arquivo: str) -> None:
+            with ZipFile(arquivo, "w") as pacote:
+                pacote.writestr("arquivo.txt", "sem estrutura Word")
+
+    with pytest.raises(ValueError, match="inválido ou está corrompido"):
+        WordService().salvar_documento(
+            DocumentoZipInvalido(),  # type: ignore[arg-type]
+            destino,
+        )
+
+    assert not destino.exists()
+    assert list(tmp_path.iterdir()) == []
