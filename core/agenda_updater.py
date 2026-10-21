@@ -11,6 +11,7 @@ from pathlib import Path
 
 from docx.document import Document as DocxDocument
 
+from services.processing_history import ProcessingHistoryService
 from services.content_validator import ContentValidator
 from services.update_report import UpdateReport, UpdateReportService
 
@@ -30,6 +31,7 @@ class AgendaUpdater:
         self.text_updater = TextUpdater()
         self.content_validator = ContentValidator()
         self.ultimo_relatorio: UpdateReport | None = None
+        self.history_service = ProcessingHistoryService()
 
     def abrir_agenda(
         self,
@@ -170,9 +172,24 @@ class AgendaUpdater:
                 quantidade,
             )
 
+            self._registrar_historico(
+                operacao="substituicoes",
+                origem=caminho,
+                destino=caminho_destino,
+                status="sucesso",
+                atualizadas=quantidade,
+                previstas=referencia,
+            )
             return quantidade
 
-        except Exception:
+        except Exception as erro:
+            self._registrar_historico(
+                operacao="substituicoes",
+                origem=caminho,
+                destino=caminho_destino,
+                status="falha",
+                erro=f"{type(erro).__name__}: {erro}",
+            )
             self.logger.exception(
                 "Erro ao atualizar a agenda. "
                 "Origem: %s | Destino: %s",
@@ -279,9 +296,24 @@ class AgendaUpdater:
                 quantidade,
             )
 
+            self._registrar_historico(
+                operacao="ano",
+                origem=caminho,
+                destino=caminho_destino,
+                status="sucesso",
+                atualizadas=quantidade,
+                previstas=referencia_ano,
+            )
             return quantidade
 
-        except Exception:
+        except Exception as erro:
+            self._registrar_historico(
+                operacao="ano",
+                origem=caminho,
+                destino=caminho_destino,
+                status="falha",
+                erro=f"{type(erro).__name__}: {erro}",
+            )
             self.logger.exception(
                 "Erro ao atualizar a agenda de %d para %d. "
                 "Origem: %s | Destino: %s",
@@ -291,6 +323,33 @@ class AgendaUpdater:
                 caminho_destino,
             )
             raise
+
+    def _registrar_historico(
+        self,
+        *,
+        operacao: str,
+        origem: Path,
+        destino: Path,
+        status: str,
+        atualizadas: int | None = None,
+        previstas: int | None = None,
+        erro: str | None = None,
+        relatorio: Path | None = None,
+    ) -> None:
+        """Registra auditoria sem comprometer o documento já publicado."""
+        try:
+            self.history_service.registrar(
+                operacao=operacao,
+                origem=origem,
+                destino=destino,
+                status=status,
+                atualizadas=atualizadas,
+                previstas=previstas,
+                erro=erro,
+                relatorio=relatorio,
+            )
+        except Exception:
+            self.logger.exception("Não foi possível registrar o histórico.")
 
     @staticmethod
     def _validar_arquivo_origem(
@@ -372,4 +431,14 @@ class AgendaUpdater:
         """Exporta o último relatório em JSON, sem sobrescrever arquivos."""
         if self.ultimo_relatorio is None:
             raise ValueError("Não existe relatório de atualização disponível.")
-        return UpdateReportService.exportar(self.ultimo_relatorio, destino)
+        caminho = UpdateReportService.exportar(self.ultimo_relatorio, destino)
+        self._registrar_historico(
+            operacao="exportacao_relatorio",
+            origem=Path(self.ultimo_relatorio.origem),
+            destino=Path(self.ultimo_relatorio.destino),
+            status="sucesso",
+            atualizadas=self.ultimo_relatorio.atualizadas,
+            previstas=self.ultimo_relatorio.previstas,
+            relatorio=caminho,
+        )
+        return caminho
