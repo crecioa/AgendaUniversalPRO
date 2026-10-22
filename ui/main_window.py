@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from config.agenda_config import AgendaConfig
+from config.app_config import AppConfig
+from services.config_service import ConfigService
 from services.agenda_application import AgendaApplication
 
 from PySide6.QtCore import Qt
@@ -21,6 +23,97 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class DiretoriosDialog(QDialog):
+    """Edita os diretórios persistentes utilizados pelo aplicativo."""
+
+    def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Configurações de diretórios")
+        self.setMinimumWidth(650)
+        self.diretorio_origem: Path | None = None
+        self.diretorio_destino: Path | None = None
+
+        layout = QVBoxLayout(self)
+        formulario = QFormLayout()
+        self.origem_edit = QLineEdit(str(config.diretorio_origem))
+        self.destino_edit = QLineEdit(str(config.diretorio_destino))
+
+        linha_origem = QHBoxLayout()
+        linha_origem.addWidget(self.origem_edit)
+        selecionar_origem = QPushButton("Procurar...")
+        selecionar_origem.clicked.connect(self._escolher_origem)
+        linha_origem.addWidget(selecionar_origem)
+        formulario.addRow("Pasta dos modelos:", linha_origem)
+
+        linha_destino = QHBoxLayout()
+        linha_destino.addWidget(self.destino_edit)
+        selecionar_destino = QPushButton("Procurar...")
+        selecionar_destino.clicked.connect(self._escolher_destino)
+        linha_destino.addWidget(selecionar_destino)
+        formulario.addRow("Pasta de saída:", linha_destino)
+        layout.addLayout(formulario)
+
+        botoes = QHBoxLayout()
+        botoes.addStretch()
+        cancelar = QPushButton("Cancelar")
+        cancelar.clicked.connect(self.reject)
+        salvar = QPushButton("Salvar")
+        salvar.clicked.connect(self._validar)
+        botoes.addWidget(cancelar)
+        botoes.addWidget(salvar)
+        layout.addLayout(botoes)
+
+    def _escolher_origem(self) -> None:
+        pasta = QFileDialog.getExistingDirectory(
+            self, "Selecionar pasta dos modelos", self.origem_edit.text()
+        )
+        if pasta:
+            self.origem_edit.setText(pasta)
+
+    def _escolher_destino(self) -> None:
+        pasta = QFileDialog.getExistingDirectory(
+            self, "Selecionar pasta de saída", self.destino_edit.text()
+        )
+        if pasta:
+            self.destino_edit.setText(pasta)
+
+    def _validar(self) -> None:
+        origem_texto = self.origem_edit.text().strip()
+        destino_texto = self.destino_edit.text().strip()
+        if not origem_texto or not destino_texto:
+            QMessageBox.warning(self, "Dados inválidos", "Informe as duas pastas.")
+            return
+        origem = Path(origem_texto).expanduser()
+        destino = Path(destino_texto).expanduser()
+        if not origem.is_dir():
+            QMessageBox.warning(
+                self, "Pasta inválida", "A pasta dos modelos deve existir."
+            )
+            return
+        if destino.exists() and not destino.is_dir():
+            QMessageBox.warning(
+                self, "Destino inválido", "O destino existe, mas não é uma pasta."
+            )
+            return
+        if not destino.exists():
+            resposta = QMessageBox.question(
+                self,
+                "Criar pasta",
+                f"A pasta de saída não existe:\n{destino}\n\nDeseja criá-la?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if resposta != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                destino.mkdir(parents=True, exist_ok=True)
+            except OSError as erro:
+                QMessageBox.critical(self, "Erro ao criar pasta", str(erro))
+                return
+        self.diretorio_origem = origem
+        self.diretorio_destino = destino
+        self.accept()
 
 
 class ConfiguracaoDialog(QDialog):
@@ -387,7 +480,7 @@ class MainWindow(QMainWindow):
         layout_principal.addStretch()
 
         rodape = QLabel(
-            "Agenda Universal PRO — versão 1.0.0"
+            "Agenda Universal PRO — versão 1.1.0 (em desenvolvimento)"
         )
 
         rodape.setAlignment(
@@ -603,11 +696,25 @@ class MainWindow(QMainWindow):
     def _mostrar_configuracoes(self) -> None:
         """Exibe as configurações."""
 
+        servico = ConfigService()
+        try:
+            atual = servico.carregar()
+            dialogo = DiretoriosDialog(atual, self)
+            if dialogo.exec() != QDialog.DialogCode.Accepted:
+                return
+            origem = dialogo.diretorio_origem
+            destino = dialogo.diretorio_destino
+            if origem is None or destino is None:
+                return
+            servico.salvar(
+                AppConfig(diretorio_origem=origem, diretorio_destino=destino)
+            )
+        except (OSError, ValueError) as erro:
+            QMessageBox.critical(self, "Erro nas configurações", str(erro))
+            return
+        self.statusBar().showMessage("Configurações salvas com sucesso.")
         QMessageBox.information(
-            self,
-            "Configurações",
-            "A tela de configurações será "
-            "implementada em uma próxima etapa.",
+            self, "Configurações", "As pastas foram salvas com sucesso."
         )
 
     def _mostrar_sobre(self) -> None:
@@ -620,6 +727,6 @@ class MainWindow(QMainWindow):
                 "<b>Agenda Universal PRO</b><br><br>"
                 "Sistema para atualização e "
                 "gerenciamento de agendas.<br><br>"
-                "Versão 1.0.0"
+                "Versão 1.1.0 (em desenvolvimento)"
             ),
         )
