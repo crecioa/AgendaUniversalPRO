@@ -14,7 +14,7 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName("Agenda Universal PRO")
-    app.setApplicationVersion("1.1.0")
+    app.setApplicationVersion("1.1.1")
 
     janela = MainWindow()
     janela.show()

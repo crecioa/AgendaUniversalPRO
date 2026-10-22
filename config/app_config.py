@@ -1,22 +1,27 @@
+
 """
 Agenda Universal PRO
 Arquivo: config/app_config.py
 
 Modelo de configuração persistente da aplicação.
-
-Sprint 4.1:
-
-* Configurações persistentes.
-  """
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from config.settings import MODELOS_DIR, OUTPUT_DIR
+
 
 @dataclass
 class AppConfig:
-  """Representa as configurações persistentes da aplicação."""
+    """Representa as configurações persistentes da aplicação."""
 
-  diretorio_origem: Path = Path("modelos")
-  diretorio_destino: Path = Path("output")
+    diretorio_origem: Path = field(
+        default_factory=lambda: MODELOS_DIR
+    )
+
+    diretorio_destino: Path = field(
+        default_factory=lambda: OUTPUT_DIR
+    )
