@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -573,10 +573,23 @@ class MainWindow(QMainWindow):
     def _nova_atualizacao(self) -> None:
         """Seleciona o documento Word de origem."""
 
+        try:
+            config = ConfigService().carregar()
+            diretorio_origem = config.diretorio_origem
+
+            pasta_inicial = (
+                str(diretorio_origem)
+                if diretorio_origem.is_dir()
+                else ""
+            )
+
+        except (OSError, ValueError):
+            pasta_inicial = ""
+
         arquivo, _ = QFileDialog.getOpenFileName(
             self,
             "Selecionar documento Word",
-            "",
+            pasta_inicial,
             "Documentos Word (*.docx)",
         )
 
