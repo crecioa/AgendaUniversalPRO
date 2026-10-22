@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from config.settings import APP_VERSION
 from config.agenda_config import AgendaConfig
 from config.app_config import AppConfig
 from services.config_service import ConfigService
@@ -480,9 +481,8 @@ class MainWindow(QMainWindow):
         layout_principal.addStretch()
 
         rodape = QLabel(
-            "Agenda Universal PRO — versão 1.1.0 (em desenvolvimento)"
+            f"Agenda Universal PRO — versão {APP_VERSION}"
         )
-
         rodape.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -727,6 +727,6 @@ class MainWindow(QMainWindow):
                 "<b>Agenda Universal PRO</b><br><br>"
                 "Sistema para atualização e "
                 "gerenciamento de agendas.<br><br>"
-                "Versão 1.1.0 (em desenvolvimento)"
+                f"Versão {APP_VERSION}"
             ),
         )
