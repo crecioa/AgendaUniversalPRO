@@ -121,22 +121,117 @@ class TextUpdater:
         paragrafo,
         substituicoes: dict[str, str],
     ) -> int:
-        """Atualiza as substituições de um parágrafo."""
+        """Atualiza datas preservando os runs e sua formata??o."""
 
         texto_original = paragrafo.text
 
         if not texto_original.strip():
             return 0
 
-        texto_atualizado, quantidade = (
-            self._substituir_texto(
-                texto_original,
-                substituicoes,
-            )
-        )
+        runs = list(paragrafo.runs)
 
-        if texto_atualizado != texto_original:
-            paragrafo.text = texto_atualizado
+        if not runs:
+            return 0
+
+        # Este m?todo trabalha com o texto concatenado dos runs.
+        # N?o altera par?grafos com estruturas textuais incompat?veis.
+        if "".join(run.text for run in runs) != texto_original:
+            return 0
+
+        texto_atualizado = texto_original
+        quantidade = 0
+
+        # Executa as substitui??es em sequ?ncia, mantendo o
+        # comportamento original de _substituir_texto.
+        for antigo, novo in substituicoes.items():
+            if not antigo:
+                continue
+
+            posicao = 0
+
+            while True:
+                indice = texto_atualizado.find(antigo, posicao)
+
+                if indice == -1:
+                    break
+
+                fim = indice + len(antigo)
+
+                # Mapeia as posi??es dos caracteres aos runs atuais.
+                limites = []
+                cursor = 0
+
+                for run in runs:
+                    inicio_run = cursor
+                    cursor += len(run.text)
+                    limites.append((inicio_run, cursor))
+
+                run_inicial = next(
+                    i for i, (_, limite) in enumerate(limites)
+                    if limite > indice
+                )
+
+                run_final = next(
+                    i for i, (_, limite) in enumerate(limites)
+                    if limite >= fim
+                )
+
+                inicio_primeiro = limites[run_inicial][0]
+                inicio_ultimo = limites[run_final][0]
+
+                if run_inicial == run_final:
+                    run = runs[run_inicial]
+                    deslocamento = indice - inicio_primeiro
+                    run.text = (
+                        run.text[:deslocamento]
+                        + novo
+                        + run.text[deslocamento + len(antigo):]
+                    )
+                else:
+                    primeiro = runs[run_inicial]
+                    ultimo = runs[run_final]
+
+                    prefixo = primeiro.text[:indice - inicio_primeiro]
+                    sufixo = ultimo.text[fim - inicio_ultimo:]
+
+                    # Mant?m a distribui??o dos caracteres substitu?dos
+                    # entre os runs sempre que os comprimentos coincidirem.
+                    if len(antigo) == len(novo):
+                        restante = novo
+
+                        for i in range(run_inicial, run_final + 1):
+                            run = runs[i]
+                            inicio_atual, fim_atual = limites[i]
+
+                            inicio_trecho = max(indice, inicio_atual)
+                            fim_trecho = min(fim, fim_atual)
+                            tamanho = fim_trecho - inicio_trecho
+
+                            parte = restante[:tamanho]
+                            restante = restante[tamanho:]
+
+                            if i == run_inicial:
+                                run.text = prefixo + parte
+                            elif i == run_final:
+                                run.text = parte + sufixo
+                            else:
+                                run.text = parte
+                    else:
+                        primeiro.text = prefixo + novo
+
+                        for i in range(run_inicial + 1, run_final):
+                            runs[i].text = ""
+
+                        ultimo.text = sufixo
+
+                texto_atualizado = (
+                    texto_atualizado[:indice]
+                    + novo
+                    + texto_atualizado[fim:]
+                )
+
+                quantidade += 1
+                posicao = indice + len(novo)
 
         return quantidade
 
@@ -190,6 +285,40 @@ class TextUpdater:
                         celula,
                         substituicoes,
                     )
+
+        # Atualiza cabe?alhos e rodap?s de todas as se??es.
+        # Evita processar novamente partes compartilhadas.
+        partes_processadas = set()
+
+        for secao in documento.sections:
+            for parte in (
+                secao.header,
+                secao.footer,
+                secao.first_page_header,
+                secao.first_page_footer,
+                secao.even_page_header,
+                secao.even_page_footer,
+            ):
+                identificador = str(parte.part.partname)
+
+                if identificador in partes_processadas:
+                    continue
+
+                partes_processadas.add(identificador)
+
+                for paragrafo in parte.paragraphs:
+                    quantidade += self._atualizar_paragrafo(
+                        paragrafo,
+                        substituicoes,
+                    )
+
+                for tabela in parte.tables:
+                    for linha in tabela.rows:
+                        for celula in linha.cells:
+                            quantidade += self._atualizar_celula(
+                                celula,
+                                substituicoes,
+                            )
 
         self.logger.info(
             "Atualização concluída. "
@@ -376,7 +505,85 @@ class TextUpdater:
             )
 
             if texto_atualizado != texto_original:
-                paragrafo.text = texto_atualizado
+                runs = list(paragrafo.runs)
+
+                if "".join(run.text for run in runs) != texto_original:
+                    raise ValueError(
+                        "Par?grafo cont?m elementos n?o representados "
+                        "pelos runs convencionais."
+                    )
+
+                # Distribui altera??es posicionais preservando os runs.
+                # Para diferen?as de comprimento, utiliza o primeiro
+                # run afetado e mant?m o texto n?o alterado.
+                from difflib import SequenceMatcher
+
+                comparador = SequenceMatcher(
+                    None,
+                    texto_original,
+                    texto_atualizado,
+                    autojunk=False,
+                )
+
+                operacoes = [
+                    (i1, i2, texto_atualizado[j1:j2])
+                    for tipo, i1, i2, j1, j2
+                    in comparador.get_opcodes()
+                    if tipo != "equal"
+                ]
+
+                for i1, i2, novo_texto in reversed(operacoes):
+                    posicao = 0
+                    limites = []
+
+                    for run in runs:
+                        limites.append((posicao, posicao + len(run.text)))
+                        posicao += len(run.text)
+
+                    afetados = [
+                        indice
+                        for indice, (inicio_run, fim_run)
+                        in enumerate(limites)
+                        if (
+                            inicio_run < i2 and fim_run > i1
+                        ) or (
+                            i1 == i2 and inicio_run <= i1 < fim_run
+                        )
+                    ]
+
+                    if not afetados:
+                        continue
+
+                    primeiro_indice = afetados[0]
+                    ultimo_indice = afetados[-1]
+
+                    primeiro = runs[primeiro_indice]
+                    ultimo = runs[ultimo_indice]
+
+                    inicio_primeiro = limites[primeiro_indice][0]
+                    inicio_ultimo = limites[ultimo_indice][0]
+
+                    prefixo = primeiro.text[:i1 - inicio_primeiro]
+                    sufixo = ultimo.text[i2 - inicio_ultimo:]
+
+                    if primeiro_indice == ultimo_indice:
+                        primeiro.text = prefixo + novo_texto + sufixo
+                    else:
+                        primeiro.text = prefixo + novo_texto
+
+                        for indice in range(
+                            primeiro_indice + 1,
+                            ultimo_indice,
+                        ):
+                            runs[indice].text = ""
+
+                        ultimo.text = sufixo
+
+                if paragrafo.text != texto_atualizado:
+                    raise ValueError(
+                        "Falha ao preservar o texto durante "
+                        "a atualiza??o do ano."
+                    )
 
             return quantidade_local
 
@@ -398,5 +605,35 @@ class TextUpdater:
             "%d substituição(ões) realizada(s).",
             quantidade,
         )
+
+        # Processa cabecalhos e rodapes sem repetir partes compartilhadas.
+        partes_processadas = set()
+
+        for secao in documento.sections:
+            for parte in (
+                secao.header,
+                secao.footer,
+                secao.first_page_header,
+                secao.first_page_footer,
+                secao.even_page_header,
+                secao.even_page_footer,
+            ):
+                identificador = str(parte.part.partname)
+
+                if identificador in partes_processadas:
+                    continue
+
+                partes_processadas.add(identificador)
+
+                for paragrafo in parte.paragraphs:
+                    quantidade += atualizar_paragrafo(paragrafo)
+
+                for tabela in parte.tables:
+                    for linha in tabela.rows:
+                        for celula in linha.cells:
+                            for paragrafo in celula.paragraphs:
+                                quantidade += atualizar_paragrafo(
+                                    paragrafo
+                                )
 
         return quantidade
