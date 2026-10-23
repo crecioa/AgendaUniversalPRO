@@ -392,21 +392,27 @@ class MainWindow(QMainWindow):
         )
 
         cartao = QFrame()
+        cartao.setObjectName("cartao_atualizacao")
+
         cartao.setFrameShape(
             QFrame.Shape.StyledPanel
         )
 
         cartao.setStyleSheet(
             """
-            QFrame {
+            QFrame#cartao_atualizacao {
                 border: 1px solid #cccccc;
                 border-radius: 10px;
-                padding: 20px;
             }
             """
         )
 
         layout_cartao = QVBoxLayout(cartao)
+
+        layout_cartao.setContentsMargins(
+            20, 20, 20, 20
+        )
+
         layout_cartao.setSpacing(12)
 
         titulo_cartao = QLabel(
