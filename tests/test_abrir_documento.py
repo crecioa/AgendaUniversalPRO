@@ -59,21 +59,12 @@ def test_abrir_documento_existente(tmp_path: Path) -> None:
     try:
         documento = tmp_path / "agenda_2027.docx"
         documento.write_bytes(b"documento de teste")
-
         janela.arquivo_destino = documento
 
-        with patch(
-            "ui.main_window.QDesktopServices.openUrl",
-            return_value=True,
-        ) as abrir:
+        with patch("ui.main_window.os.startfile") as abrir:
             janela._abrir_documento_gerado()
 
-        abrir.assert_called_once()
-
-        url = abrir.call_args.args[0]
-
-        assert url.isLocalFile()
-        assert Path(url.toLocalFile()) == documento.resolve()
+        abrir.assert_called_once_with(str(documento.resolve()))
     finally:
         janela.close()
 
@@ -108,17 +99,14 @@ def test_falha_ao_abrir_documento(tmp_path: Path) -> None:
     try:
         documento = tmp_path / "agenda_2027.docx"
         documento.write_bytes(b"documento de teste")
-
         janela.arquivo_destino = documento
 
         with (
             patch(
-                "ui.main_window.QDesktopServices.openUrl",
-                return_value=False,
+                "ui.main_window.os.startfile",
+                side_effect=OSError("Falha simulada ao abrir arquivo"),
             ) as abrir,
-            patch(
-                "ui.main_window.QMessageBox.warning"
-            ) as aviso,
+            patch("ui.main_window.QMessageBox.warning") as aviso,
         ):
             janela._abrir_documento_gerado()
 

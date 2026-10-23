@@ -1,4 +1,5 @@
 ﻿from __future__ import annotations
+import os
 
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -528,6 +530,8 @@ class MainWindow(QMainWindow):
         layout_resultado = QVBoxLayout(
             self.painel_resultado
         )
+        layout_resultado.setContentsMargins(15, 15, 15, 15)
+        layout_resultado.setSpacing(10)
 
         titulo_resultado = QLabel(
             "Resultado da última atualização"
@@ -573,6 +577,8 @@ class MainWindow(QMainWindow):
             "botao_abrir_documento"
         )
 
+        self.botao_abrir_documento.setMinimumHeight(38)
+
         self.botao_abrir_documento.setEnabled(False)
 
         self.botao_abrir_documento.clicked.connect(
@@ -612,8 +618,12 @@ class MainWindow(QMainWindow):
 
         layout_principal.addWidget(rodape)
 
-        self.setCentralWidget(central)
+        area_rolagem = QScrollArea()
+        area_rolagem.setWidgetResizable(True)
+        area_rolagem.setFrameShape(QFrame.Shape.NoFrame)
+        area_rolagem.setWidget(central)
 
+        self.setCentralWidget(area_rolagem)
     def _criar_menus(self) -> None:
         """Cria os menus da aplicação."""
 
@@ -909,7 +919,7 @@ class MainWindow(QMainWindow):
         )
 
     def _abrir_documento_gerado(self) -> None:
-        """Abre o último documento Word gerado com sucesso."""
+        """Abre o documento gerado no aplicativo padrão do Windows."""
         caminho = self.arquivo_destino
 
         if caminho is None or not caminho.is_file():
@@ -920,13 +930,13 @@ class MainWindow(QMainWindow):
             )
             return
 
-        url = QUrl.fromLocalFile(str(caminho.resolve()))
-
-        if not QDesktopServices.openUrl(url):
+        try:
+            os.startfile(str(caminho.resolve()))
+        except OSError as erro:
             QMessageBox.warning(
                 self,
                 "Não foi possível abrir",
-                "Não foi possível abrir o documento Word.",
+                f"Não foi possível abrir o documento Word.\n\n{erro}",
             )
 
     def closeEvent(self, event: QCloseEvent) -> None:
