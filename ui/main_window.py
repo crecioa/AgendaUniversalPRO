@@ -487,6 +487,23 @@ class MainWindow(QMainWindow):
         layout_cartao.addWidget(
             self.barra_progresso
         )
+        self.status_processamento = QLabel(
+            "Aguardando atualização."
+        )
+        self.status_processamento.setWordWrap(True)
+        self.status_processamento.setStyleSheet(
+            """
+            QLabel {
+                font-size: 12px;
+                color: #64748b;
+                border: none;
+            }
+            """
+        )
+
+        layout_cartao.addWidget(
+            self.status_processamento
+        )
 
         layout_principal.addWidget(titulo)
         layout_principal.addWidget(descricao)
@@ -683,6 +700,8 @@ class MainWindow(QMainWindow):
             ano_origem=self.ano_origem,
             ano_destino=self.ano_destino,
         )
+        self._resultado_quantidade = None
+        self._resultado_erro = None
         self.worker = AgendaWorker(config)
 
         self.worker.sucesso.connect(
@@ -696,9 +715,16 @@ class MainWindow(QMainWindow):
         )
 
         self.botao_nova.setEnabled(False)
+        self.barra_progresso.show()
+
+        self.status_processamento.setText(
+            "Processando documento Word..."
+        )
+
         self.statusBar().showMessage(
             "Atualizando agenda em segundo plano..."
         )
+
         self.worker.start()
 
     def _atualizacao_concluida(self, quantidade: int) -> None:
@@ -730,6 +756,9 @@ class MainWindow(QMainWindow):
         if self._resultado_erro is not None:
             mensagem = self._resultado_erro
             self._resultado_erro = None
+            self.status_processamento.setText(
+                "Erro durante a atualização."
+            )
 
             self.statusBar().showMessage(
                 "Erro durante a atualização."
@@ -750,10 +779,17 @@ class MainWindow(QMainWindow):
         self._resultado_quantidade = None
 
         if quantidade is None:
+            self.status_processamento.setText(
+                "Atualização encerrada sem resultado."
+            )
+
             self.statusBar().showMessage(
                 "Atualização encerrada sem resultado."
             )
             return
+        self.status_processamento.setText(
+            "Atualização concluída com sucesso."
+        )
 
         self.statusBar().showMessage(
             "Atualização concluída com sucesso."
