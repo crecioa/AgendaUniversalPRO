@@ -133,10 +133,36 @@ class TextUpdater:
         if not runs:
             return 0
 
-        # Este m?todo trabalha com o texto concatenado dos runs.
-        # N?o altera par?grafos com estruturas textuais incompat?veis.
+        # Trata separadamente os runs convencionais e os hyperlinks.
+        # N?o mistura caracteres de dentro e fora de um hyperlink.
         if "".join(run.text for run in runs) != texto_original:
-            return 0
+            class GrupoRuns:
+                def __init__(self, runs_grupo):
+                    self.runs = runs_grupo
+
+                @property
+                def text(self):
+                    return "".join(run.text for run in self.runs)
+
+            quantidade_total = 0
+
+            for elemento in paragrafo.iter_inner_content():
+                if hasattr(elemento, "runs"):
+                    runs_grupo = list(elemento.runs)
+                else:
+                    runs_grupo = [elemento]
+
+                if not runs_grupo:
+                    continue
+
+                grupo = GrupoRuns(runs_grupo)
+
+                quantidade_total += self._atualizar_paragrafo(
+                    grupo,
+                    substituicoes,
+                )
+
+            return quantidade_total
 
         texto_atualizado = texto_original
         quantidade = 0
@@ -508,10 +534,128 @@ class TextUpdater:
                 runs = list(paragrafo.runs)
 
                 if "".join(run.text for run in runs) != texto_original:
-                    raise ValueError(
-                        "Par?grafo cont?m elementos n?o representados "
-                        "pelos runs convencionais."
-                    )
+                    # Processa trechos convencionais e hyperlinks
+                    # separadamente, preservando seus relacionamentos.
+                    quantidade_segura = 0
+
+                    for elemento in paragrafo.iter_inner_content():
+                        if hasattr(elemento, "runs"):
+                            runs_elemento = list(elemento.runs)
+                        else:
+                            runs_elemento = [elemento]
+
+                        texto_grupo = "".join(
+                            run.text for run in runs_elemento
+                        )
+
+                        novo_grupo, qtd = atualizar_texto(
+                            texto_grupo
+                        )
+
+                        if novo_grupo != texto_grupo:
+                            from difflib import SequenceMatcher
+
+                            comparador_grupo = SequenceMatcher(
+                                None,
+                                texto_grupo,
+                                novo_grupo,
+                                autojunk=False,
+                            )
+
+                            operacoes_grupo = [
+                                (i1, i2, novo_grupo[j1:j2])
+                                for tipo, i1, i2, j1, j2
+                                in comparador_grupo.get_opcodes()
+                                if tipo != "equal"
+                            ]
+
+                            for i1, i2, novo_trecho in reversed(
+                                operacoes_grupo
+                            ):
+                                limites_grupo = []
+                                posicao_grupo = 0
+
+                                for run in runs_elemento:
+                                    inicio = posicao_grupo
+                                    posicao_grupo += len(run.text)
+                                    limites_grupo.append(
+                                        (inicio, posicao_grupo)
+                                    )
+
+                                afetados = [
+                                    indice
+                                    for indice, (inicio, fim)
+                                    in enumerate(limites_grupo)
+                                    if (
+                                        inicio < i2 and fim > i1
+                                    ) or (
+                                        i1 == i2
+                                        and inicio <= i1 < fim
+                                    )
+                                ]
+
+                                if not afetados:
+                                    raise ValueError(
+                                        "N?o foi poss?vel mapear "
+                                        "a altera??o no hyperlink."
+                                    )
+
+                                primeiro_indice = afetados[0]
+                                ultimo_indice = afetados[-1]
+
+                                primeiro = runs_elemento[
+                                    primeiro_indice
+                                ]
+                                ultimo = runs_elemento[
+                                    ultimo_indice
+                                ]
+
+                                inicio_primeiro = limites_grupo[
+                                    primeiro_indice
+                                ][0]
+                                inicio_ultimo = limites_grupo[
+                                    ultimo_indice
+                                ][0]
+
+                                prefixo = primeiro.text[
+                                    :i1 - inicio_primeiro
+                                ]
+                                sufixo = ultimo.text[
+                                    i2 - inicio_ultimo:
+                                ]
+
+                                if primeiro_indice == ultimo_indice:
+                                    primeiro.text = (
+                                        prefixo
+                                        + novo_trecho
+                                        + sufixo
+                                    )
+                                else:
+                                    primeiro.text = (
+                                        prefixo + novo_trecho
+                                    )
+
+                                    for indice in range(
+                                        primeiro_indice + 1,
+                                        ultimo_indice,
+                                    ):
+                                        runs_elemento[indice].text = ""
+
+                                    ultimo.text = sufixo
+
+                            texto_final = "".join(
+                                run.text for run in runs_elemento
+                            )
+
+                            if texto_final != novo_grupo:
+                                raise ValueError(
+                                    "Falha ao preservar o texto "
+                                    "do hyperlink."
+                                )
+
+                        quantidade_segura += qtd
+
+                    return quantidade_segura
 
                 # Distribui altera??es posicionais preservando os runs.
                 # Para diferen?as de comprimento, utiliza o primeiro
