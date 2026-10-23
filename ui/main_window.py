@@ -6,10 +6,10 @@ from config.settings import APP_VERSION
 from config.agenda_config import AgendaConfig
 from config.app_config import AppConfig
 from services.config_service import ConfigService
-from services.agenda_application import AgendaApplication
+from ui.agenda_worker import AgendaWorker
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -337,6 +337,10 @@ class MainWindow(QMainWindow):
         self.ano_origem: int | None = None
         self.ano_destino: int | None = None
 
+        self.worker: AgendaWorker | None = None
+
+        self._resultado_quantidade: int | None = None
+        self._resultado_erro: str | None = None
         self._criar_interface()
         self._criar_menus()
         self._criar_barra_status()
@@ -446,13 +450,13 @@ class MainWindow(QMainWindow):
             """
         )
 
-        botao_nova = QPushButton(
+        self.botao_nova = QPushButton(
             "Selecionar documento Word"
         )
 
-        botao_nova.setMinimumHeight(45)
+        self.botao_nova.setMinimumHeight(45)
 
-        botao_nova.clicked.connect(
+        self.botao_nova.clicked.connect(
             self._nova_atualizacao
         )
 
@@ -471,7 +475,7 @@ class MainWindow(QMainWindow):
         )
 
         layout_cartao.addWidget(
-            botao_nova
+            self.botao_nova
         )
 
         layout_principal.addWidget(titulo)
@@ -655,39 +659,94 @@ class MainWindow(QMainWindow):
             )
             return
 
+        if self.worker is not None:
+            QMessageBox.warning(
+                self,
+                "Atualização em andamento",
+                "Aguarde a conclusão da atualização atual.",
+            )
+            return
+
         config = AgendaConfig(
             arquivo_origem=self.arquivo_origem,
             arquivo_destino=self.arquivo_destino,
             ano_origem=self.ano_origem,
             ano_destino=self.ano_destino,
         )
+        self.worker = AgendaWorker(config)
 
-        aplicacao = AgendaApplication()
-
-        self.statusBar().showMessage(
-            "Atualizando agenda..."
+        self.worker.sucesso.connect(
+            self._atualizacao_concluida
+        )
+        self.worker.erro.connect(
+            self._atualizacao_erro
+        )
+        self.worker.finished.connect(
+            self._atualizacao_finalizada
         )
 
-        try:
-            quantidade = aplicacao.atualizar(
-                config
+        self.botao_nova.setEnabled(False)
+        self.statusBar().showMessage(
+            "Atualizando agenda em segundo plano..."
+        )
+        self.worker.start()
+
+    def _atualizacao_concluida(self, quantidade: int) -> None:
+        """Armazena o resultado do processamento."""
+        self._resultado_quantidade = quantidade
+        self._resultado_erro = None
+
+    def _atualizacao_erro(self, mensagem: str) -> None:
+        """Armazena a mensagem de erro."""
+        self._resultado_quantidade = None
+        self._resultado_erro = mensagem
+
+    def _atualizacao_finalizada(self) -> None:
+        """Finaliza a thread e apresenta o resultado."""
+
+        worker = self.worker
+
+        if worker is None:
+            return
+
+        # O sinal finished indica que run() terminou.
+        # Aguarda o encerramento completo da thread.
+        worker.wait()
+
+        self.worker = None
+        self.botao_nova.setEnabled(True)
+
+        if self._resultado_erro is not None:
+            mensagem = self._resultado_erro
+            self._resultado_erro = None
+
+            self.statusBar().showMessage(
+                "Erro durante a atualização."
             )
 
-        except Exception as erro:
             QMessageBox.critical(
                 self,
                 "Erro na atualização",
                 (
                     "Não foi possível atualizar "
                     "a agenda.\n\n"
-                    f"{erro}"
+                    f"{mensagem}"
                 ),
             )
+            return
 
+        quantidade = self._resultado_quantidade
+        self._resultado_quantidade = None
+
+        if quantidade is None:
             self.statusBar().showMessage(
-                "Erro durante a atualização."
+                "Atualização encerrada sem resultado."
             )
             return
+
+        self.statusBar().showMessage(
+            "Atualização concluída com sucesso."
+        )
 
         QMessageBox.information(
             self,
@@ -701,10 +760,23 @@ class MainWindow(QMainWindow):
                 f"{self.arquivo_destino}"
             ),
         )
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Impede o fechamento durante uma atualização."""
 
-        self.statusBar().showMessage(
-            "Atualização concluída com sucesso."
-        )
+        if self.worker is not None:
+            if self.worker.isRunning():
+                QMessageBox.warning(
+                    self,
+                    "Atualização em andamento",
+                    (
+                        "Aguarde a conclusão da atualização "
+                        "antes de fechar o aplicativo."
+                    ),
+                )
+                event.ignore()
+                return
+
+        event.accept()
 
     def _mostrar_configuracoes(self) -> None:
         """Exibe as configurações."""
