@@ -1,9 +1,9 @@
 """Testes do indicador visual de processamento."""
-
 from __future__ import annotations
-from unittest.mock import MagicMock, patch
 
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -195,6 +195,126 @@ def test_status_atualizado_apos_erro_do_worker() -> None:
 
         assert janela._resultado_erro is None
         mensagem_erro.assert_called_once()
+
+    finally:
+        janela.close()
+def test_painel_resultado_inicialmente_oculto() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    janela = MainWindow()
+
+    try:
+        assert janela.painel_resultado.isHidden()
+        assert (
+            janela.resultado_quantidade.text()
+            == "Datas atualizadas: 0"
+        )
+        assert (
+            janela.resultado_arquivo.text()
+            == "Arquivo gerado: —"
+        )
+    finally:
+        janela.close()
+def test_painel_resultado_apos_sucesso() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    janela = MainWindow()
+
+    try:
+        worker_simulado = MagicMock()
+        janela.worker = worker_simulado
+
+        janela.arquivo_destino = Path(
+            "agenda_atualizada_2027.docx"
+        )
+
+        janela._resultado_quantidade = 12
+        janela._resultado_erro = None
+
+        assert janela.painel_resultado.isHidden()
+
+        with patch(
+            "ui.main_window.QMessageBox.information"
+        ):
+            janela._atualizacao_finalizada()
+
+        worker_simulado.wait.assert_called_once()
+
+        assert not janela.painel_resultado.isHidden()
+
+        assert (
+            janela.resultado_quantidade.text()
+            == "Datas atualizadas: 12"
+        )
+
+        assert (
+            janela.resultado_arquivo.text()
+            == "Arquivo gerado: agenda_atualizada_2027.docx"
+        )
+
+        assert janela.worker is None
+
+    finally:
+        janela.close()
+def test_painel_resultado_com_zero_atualizacoes() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    janela = MainWindow()
+
+    try:
+        worker_simulado = MagicMock()
+        janela.worker = worker_simulado
+
+        janela.arquivo_destino = Path("agenda_sem_alteracoes.docx")
+        janela._resultado_quantidade = 0
+        janela._resultado_erro = None
+
+        with patch("ui.main_window.QMessageBox.information"):
+            janela._atualizacao_finalizada()
+
+        worker_simulado.wait.assert_called_once()
+
+        assert not janela.painel_resultado.isHidden()
+        assert (
+            janela.resultado_quantidade.text()
+            == "Datas atualizadas: 0"
+        )
+        assert (
+            janela.resultado_arquivo.text()
+            == "Arquivo gerado: agenda_sem_alteracoes.docx"
+        )
+
+    finally:
+        janela.close()
+
+
+def test_painel_resultado_oculto_apos_erro() -> None:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    janela = MainWindow()
+
+    try:
+        worker_simulado = MagicMock()
+        janela.worker = worker_simulado
+
+        janela._resultado_quantidade = None
+        janela._resultado_erro = "Erro simulado"
+
+        with patch("ui.main_window.QMessageBox.critical"):
+            janela._atualizacao_finalizada()
+
+        worker_simulado.wait.assert_called_once()
+
+        assert janela.painel_resultado.isHidden()
+        assert janela.worker is None
 
     finally:
         janela.close()

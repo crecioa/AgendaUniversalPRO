@@ -504,6 +504,66 @@ class MainWindow(QMainWindow):
         layout_cartao.addWidget(
             self.status_processamento
         )
+        self.painel_resultado = QFrame()
+        self.painel_resultado.setObjectName(
+            "painel_resultado"
+        )
+
+        self.painel_resultado.setStyleSheet(
+            """
+            QFrame#painel_resultado {
+                background-color: #f0fdf4;
+                border: 1px solid #bbf7d0;
+                border-radius: 8px;
+            }
+            """
+        )
+
+        layout_resultado = QVBoxLayout(
+            self.painel_resultado
+        )
+
+        titulo_resultado = QLabel(
+            "Resultado da última atualização"
+        )
+
+        titulo_resultado.setStyleSheet(
+            """
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                border: none;
+            }
+            """
+        )
+
+        self.resultado_quantidade = QLabel(
+            "Datas atualizadas: 0"
+        )
+
+        self.resultado_arquivo = QLabel(
+            "Arquivo gerado: —"
+        )
+
+        self.resultado_arquivo.setWordWrap(True)
+
+        layout_resultado.addWidget(
+            titulo_resultado
+        )
+
+        layout_resultado.addWidget(
+            self.resultado_quantidade
+        )
+
+        layout_resultado.addWidget(
+            self.resultado_arquivo
+        )
+
+        self.painel_resultado.hide()
+
+        layout_cartao.addWidget(
+            self.painel_resultado
+        )
 
         layout_principal.addWidget(titulo)
         layout_principal.addWidget(descricao)
@@ -702,6 +762,9 @@ class MainWindow(QMainWindow):
         )
         self._resultado_quantidade = None
         self._resultado_erro = None
+
+        self.painel_resultado.hide()
+
         self.worker = AgendaWorker(config)
 
         self.worker.sucesso.connect(
@@ -787,9 +850,20 @@ class MainWindow(QMainWindow):
                 "Atualização encerrada sem resultado."
             )
             return
+
         self.status_processamento.setText(
             "Atualização concluída com sucesso."
         )
+
+        self.resultado_quantidade.setText(
+            f"Datas atualizadas: {quantidade}"
+        )
+
+        self.resultado_arquivo.setText(
+            f"Arquivo gerado: {self.arquivo_destino}"
+        )
+
+        self.painel_resultado.show()
 
         self.statusBar().showMessage(
             "Atualização concluída com sucesso."
