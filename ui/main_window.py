@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -477,6 +478,15 @@ class MainWindow(QMainWindow):
         layout_cartao.addWidget(
             self.botao_nova
         )
+        self.barra_progresso = QProgressBar()
+        self.barra_progresso.setRange(0, 0)
+        self.barra_progresso.setTextVisible(False)
+        self.barra_progresso.setMinimumHeight(12)
+        self.barra_progresso.hide()
+
+        layout_cartao.addWidget(
+            self.barra_progresso
+        )
 
         layout_principal.addWidget(titulo)
         layout_principal.addWidget(descricao)
@@ -715,6 +725,7 @@ class MainWindow(QMainWindow):
 
         self.worker = None
         self.botao_nova.setEnabled(True)
+        self.barra_progresso.hide()
 
         if self._resultado_erro is not None:
             mensagem = self._resultado_erro
