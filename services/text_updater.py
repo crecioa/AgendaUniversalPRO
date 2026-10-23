@@ -534,6 +534,101 @@ class TextUpdater:
                 runs = list(paragrafo.runs)
 
                 if "".join(run.text for run in runs) != texto_original:
+                    # Sprint 6.9: preserva as fronteiras dos hyperlinks
+                    # quando a substitui??o mant?m o comprimento.
+                    from difflib import SequenceMatcher
+
+                    grupos = []
+                    for elemento in paragrafo.iter_inner_content():
+                        if hasattr(elemento, "runs"):
+                            grupos.append(list(elemento.runs))
+                        else:
+                            grupos.append([elemento])
+
+                    runs_ordenados = [
+                        run
+                        for grupo in grupos
+                        for run in grupo
+                    ]
+
+                    texto_runs = "".join(
+                        run.text for run in runs_ordenados
+                    )
+
+                    if texto_runs == texto_original:
+                        comparador_misto = SequenceMatcher(
+                            None,
+                            texto_original,
+                            texto_atualizado,
+                            autojunk=False,
+                        )
+
+                        operacoes_mistas = [
+                            (i1, i2, texto_atualizado[j1:j2])
+                            for tipo, i1, i2, j1, j2
+                            in comparador_misto.get_opcodes()
+                            if tipo != "equal"
+                        ]
+
+                        if (
+                            operacoes_mistas
+                            and all(
+                                i2 - i1 == len(novo_trecho)
+                                for i1, i2, novo_trecho
+                                in operacoes_mistas
+                            )
+                        ):
+                            limites_mistos = []
+                            cursor_misto = 0
+
+                            for run in runs_ordenados:
+                                inicio = cursor_misto
+                                cursor_misto += len(run.text)
+                                limites_mistos.append(
+                                    (inicio, cursor_misto)
+                                )
+
+                            novos_textos = [
+                                run.text for run in runs_ordenados
+                            ]
+
+                            for i1, i2, novo_trecho in operacoes_mistas:
+                                for indice, (inicio, fim) in enumerate(
+                                    limites_mistos
+                                ):
+                                    inicio_comum = max(i1, inicio)
+                                    fim_comum = min(i2, fim)
+
+                                    if inicio_comum >= fim_comum:
+                                        continue
+
+                                    inicio_local = inicio_comum - inicio
+                                    fim_local = fim_comum - inicio
+                                    inicio_novo = inicio_comum - i1
+                                    fim_novo = fim_comum - i1
+
+                                    texto_run = novos_textos[indice]
+                                    novos_textos[indice] = (
+                                        texto_run[:inicio_local]
+                                        + novo_trecho[
+                                            inicio_novo:fim_novo
+                                        ]
+                                        + texto_run[fim_local:]
+                                    )
+
+                            if (
+                                "".join(novos_textos)
+                                == texto_atualizado
+                            ):
+                                for run, novo_texto_run in zip(
+                                    runs_ordenados,
+                                    novos_textos,
+                                ):
+                                    if run.text != novo_texto_run:
+                                        run.text = novo_texto_run
+
+                                return quantidade_local
+
                     # Processa trechos convencionais e hyperlinks
                     # separadamente, preservando seus relacionamentos.
                     quantidade_segura = 0
