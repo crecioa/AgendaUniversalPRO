@@ -8,8 +8,8 @@ from config.app_config import AppConfig
 from services.config_service import ConfigService
 from ui.agenda_worker import AgendaWorker
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QCloseEvent
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -565,6 +565,24 @@ class MainWindow(QMainWindow):
             self.resultado_arquivo
         )
 
+        self.botao_abrir_documento = QPushButton(
+            "Abrir documento gerado"
+        )
+
+        self.botao_abrir_documento.setObjectName(
+            "botao_abrir_documento"
+        )
+
+        self.botao_abrir_documento.setEnabled(False)
+
+        self.botao_abrir_documento.clicked.connect(
+            self._abrir_documento_gerado
+        )
+
+        layout_resultado.addWidget(
+            self.botao_abrir_documento
+        )
+
         self.painel_resultado.hide()
 
         layout_cartao.addWidget(
@@ -770,6 +788,7 @@ class MainWindow(QMainWindow):
         self._resultado_erro = None
 
         self.painel_resultado.hide()
+        self.botao_abrir_documento.setEnabled(False)
 
         self.worker = AgendaWorker(config)
 
@@ -869,6 +888,7 @@ class MainWindow(QMainWindow):
             f"Arquivo gerado: {self.arquivo_destino}"
         )
 
+        self.botao_abrir_documento.setEnabled(True)
         self.painel_resultado.show()
 
         self.statusBar().showMessage(
@@ -887,6 +907,28 @@ class MainWindow(QMainWindow):
                 f"{self.arquivo_destino}"
             ),
         )
+
+    def _abrir_documento_gerado(self) -> None:
+        """Abre o último documento Word gerado com sucesso."""
+        caminho = self.arquivo_destino
+
+        if caminho is None or not caminho.is_file():
+            QMessageBox.warning(
+                self,
+                "Arquivo não encontrado",
+                "O documento gerado não foi encontrado.",
+            )
+            return
+
+        url = QUrl.fromLocalFile(str(caminho.resolve()))
+
+        if not QDesktopServices.openUrl(url):
+            QMessageBox.warning(
+                self,
+                "Não foi possível abrir",
+                "Não foi possível abrir o documento Word.",
+            )
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Impede o fechamento durante uma atualização."""
 
