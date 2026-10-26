@@ -1,6 +1,6 @@
 # Agenda Universal PRO
 
-**Versão:** 1.0.0  
+**Versão:** 1.1.1 Final
 **Plataforma de uso documentada:** Windows, PowerShell e Python 3  
 **Interface:** menu interativo no terminal
 
@@ -100,4 +100,30 @@ Na auditoria de 21/10/2026, foram informados **259 testes aprovados**, `pip chec
 
 ## Versionamento e entrega
 
-A versão indicada na interface é **1.0.0**. A criação da tag Git `v1.0.0` deve ocorrer somente após a conferência final dos arquivos, dos testes e do estado do repositório.
+A versão final do sistema é **Agenda Universal PRO 1.1.1**.
+
+A identificação da versão é centralizada na constante
+`APP_VERSION`, definida em `config/settings.py`, e utilizada
+pela aplicação.
+
+A tag Git `v1.1.1` foi criada anteriormente para registrar
+as correções de portabilidade Windows e persistência das configurações.
+
+A entrega final da versão 1.1.1 incorpora as melhorias posteriores,
+incluindo as auditorias de integridade e relacionamentos dos
+documentos DOCX.
+
+A validação final compreende:
+
+- Execução dos testes automatizados.
+- Verificação de tipagem com Mypy.
+- Validação da inicialização e das principais funcionalidades.
+- Conferência da documentação e das dependências.
+- Revisão do estado do repositório Git.
+- Teste de atualização de documentos DOCX e preservação do original.
+
+A tag existente `v1.1.1` será preservada em seu commit original.
+O encerramento final será registrado em um novo commit.
+
+A versão 1.1.1 representa o encerramento do desenvolvimento planejado.
+Novas funcionalidades não fazem parte desta entrega.

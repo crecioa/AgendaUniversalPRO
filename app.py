@@ -4,7 +4,7 @@ from pathlib import Path
 
 from config.agenda_config import AgendaConfig
 from config.app_config import AppConfig
-from config.settings import create_directories
+from config.settings import APP_VERSION, create_directories
 from services.agenda_application import AgendaApplication
 from services.config_service import ConfigService
 from services.logger_service import LoggerService
@@ -490,7 +490,7 @@ def main() -> None:
 
     print()
     print("=" * 60)
-    print("Agenda Universal PRO v1.0.0")
+    print(f"Agenda Universal PRO v{APP_VERSION}")
     print("=" * 60)
 
     while True:
